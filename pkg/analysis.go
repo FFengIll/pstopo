@@ -56,11 +56,11 @@ func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 			topo.AddPidNeighbor(pid)
 
 			// add their ports
-			for _, conn := range snapshot.PidListen[pid] {
-				ports = append(ports, conn.Laddr.Port)
+			for _, port := range snapshot.PidListenPort[pid] {
+				ports = append(ports, port)
 			}
-			for _, conn := range snapshot.PidConnection[pid] {
-				ports = append(ports, conn.Laddr.Port)
+			for _, port := range snapshot.PidPort[pid] {
+				ports = append(ports, port)
 			}
 
 		}
@@ -70,10 +70,10 @@ func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 			listenPort := port
 			listenPid, ok := snapshot.ListenPortPid[listenPort]
 			if ok {
-				connections := snapshot.RemotePortConnection[listenPort]
+				connections := snapshot.ListenPortConnections[listenPort]
 				for _, conn := range connections {
 					connPort := conn.Laddr.Port
-					connPid, ok := snapshot.LocalPortPid[connPort]
+					connPid, ok := snapshot.PortPid[connPort]
 					if ok {
 						topo.AddPid(listenPid)
 						topo.AddPid(connPid)
@@ -85,23 +85,20 @@ func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 
 			// establish Port
 			connPort := port
-			connPid, ok := snapshot.LocalPortPid[connPort]
+			connPid, ok := snapshot.PortPid[connPort]
 			if ok {
-				connections := snapshot.PidConnection[connPid]
-				for _, conn := range connections {
-					if conn.Laddr.Port == connPort {
-						listenIP, listenPort := conn.Raddr.IP, conn.Raddr.Port
+				conn := snapshot.GetConnections(connPort)
+				if conn.Laddr.Port == connPort { //redundant
+					listenIP, listenPort := conn.Raddr.IP, conn.Raddr.Port
 
-						if !isPrivateIP(net.IP(listenIP)) {
-							// remote is external ip
-							topo.LinkPublicNetwork(connPid, conn)
-						} else {
-							// remote is process
-							listenPid, ok := snapshot.ListenPortPid[listenPort]
-							if ok {
-								topo.LinkNetwork(connPid, listenPid, conn)
-							}
-
+					if !isPrivateIP(net.IP(listenIP)) {
+						// remote is external ip
+						topo.LinkPublicNetwork(connPid, conn)
+					} else {
+						// remote is process
+						listenPid, ok := snapshot.ListenPortPid[listenPort]
+						if ok {
+							topo.LinkNetwork(connPid, listenPid, conn)
 						}
 
 					}
@@ -118,53 +115,11 @@ func TopoAll(snapshot *Snapshot, topo *PSTopo) {
 		topo.AddProcess(process)
 		topo.AddPidNeighbor(pid)
 	}
-	for pid, connections := range snapshot.PidConnection {
-		for _, conn := range connections {
-			otherPid := snapshot.LocalPortPid[conn.Raddr.Port]
+	for pid, ports := range snapshot.PidPort {
+		for _, port := range ports {
+			conn := snapshot.GetConnections(port)
+			otherPid := snapshot.PortPid[conn.Raddr.Port]
 			topo.LinkNetwork(pid, otherPid, conn)
 		}
 	}
-}
-
-func dummy() {
-
-	//res := NewGroup()
-	//
-	//// get All Pid
-	//pids, err := Cmd.PidsWithContext(context.Background())
-	//if err != nil {
-	//	return nil
-	//}
-	//for _, Pid := range pids {
-	//	for _, target := range group.Pid {
-	//		if Pid == target {
-	//			res.Pid = append(res.Pid, target)
-	//		}
-	//	}
-	//}
-	//
-	//// get each Cmd
-	//ps := make([]*Cmd.Process, 10)
-	//for _, Pid := range pids {
-	//	p, _ := Cmd.NewProcessWithContext(context.Background(), Pid)
-	//	cmdline, _ := p.Cmdline()
-	//	for _, target := range group.Cmd {
-	//		if strings.Contains(cmdline, target) {
-	//			ps = append(ps, p)
-	//			res.Cmd = append(res.Cmd, target)
-	//		}
-	//	}
-	//}
-	//
-	//// get each by Port
-	//for _, Pid := range pids {
-	//	connections, err := net.ConnectionsPid("ESTABLISHED", Pid)
-	//	if err != nil {
-	//		return nil
-	//	}
-	//	for _, conn := range connections {
-	//		fmt.Printf("PID=%d, LISTEN on :%d, Cmdline=%s\n", conn.Pid, conn.Laddr.Port, conn.Laddr)
-	//		break
-	//	}
-	//}
 }

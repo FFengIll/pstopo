@@ -13,28 +13,28 @@ import (
 )
 
 type Snapshot struct {
-	matched FilterOption
+	PidProcess    map[int32]*Process `yaml:"process"`
+	PidListenPort map[int32][]uint32 `yaml:"pid_listen_port"`
+	PidPort       map[int32][]uint32 `yaml:"pid_port"`
 
-	PidProcess    map[int32]*Process             `yaml:"process"`
-	PidListen     map[int32][]net.ConnectionStat `yaml:"listen"`
-	PidConnection map[int32][]net.ConnectionStat `yaml:"connection"`
+	ListenPortConnections map[uint32][]net.ConnectionStat `yaml:"listen_port_connection"`
+	ListenPortPid         map[uint32]int32                `yaml:"listen_port_pid"`
 
-	ListenPortPid map[uint32]int32 `yaml:"listen_port_pid"`
-	LocalPortPid  map[uint32]int32 `yaml:"local_port_pid"`
-
-	RemotePortConnection map[uint32][]net.ConnectionStat `yaml:"remote_port_connection"`
+	PortConnection map[uint32]net.ConnectionStat `yaml:"port_connection"`
+	PortPid        map[uint32]int32              `yaml:"port_pid"`
 }
 
 func NewSnapshot() *Snapshot {
 	s := Snapshot{
 		PidProcess:    map[int32]*Process{},
-		PidListen:     map[int32][]net.ConnectionStat{},
-		PidConnection: map[int32][]net.ConnectionStat{},
+		PidListenPort: map[int32][]uint32{},
+		PidPort:       map[int32][]uint32{},
 
-		ListenPortPid: map[uint32]int32{},
-		LocalPortPid:  map[uint32]int32{},
+		ListenPortConnections: map[uint32][]net.ConnectionStat{},
+		ListenPortPid:         map[uint32]int32{},
 
-		RemotePortConnection: map[uint32][]net.ConnectionStat{},
+		PortConnection: map[uint32]net.ConnectionStat{},
+		PortPid:        map[uint32]int32{},
 	}
 	return &s
 }
@@ -73,33 +73,35 @@ func TakeSnapshot() (*Snapshot, error) {
 		}
 	}
 
-	var kind = ""
-
-	//if err := fillConnection(kind, Pid, snapshot.PidListen[Pid]); err != nil {
-	//	log.Error("Pid={} error={}", Pid, err)
-	//}
-
 	// here, `gopsutil` use Pid=0 to fetch All connections
+	var kind = ""
 	connections, err := net.Connections(kind)
 	if err != nil {
 		return nil, err
 	}
 	for _, conn := range connections {
+
 		if strings.EqualFold(conn.Status, "LISTEN") {
-			listen := snapshot.PidListen[conn.Pid]
-			listen = append(listen, conn)
-			snapshot.PidListen[conn.Pid] = listen
+			listenPort := conn.Laddr.Port
 
-			snapshot.ListenPortPid[conn.Laddr.Port] = conn.Pid
+			snapshot.ListenPortPid[listenPort] = conn.Pid
+
+			conns := snapshot.ListenPortConnections[listenPort]
+			snapshot.ListenPortConnections[listenPort] = append(conns, conn)
+
+			listen := snapshot.PidListenPort[conn.Pid]
+			snapshot.PidListenPort[conn.Pid] = append(listen, listenPort)
+
 		} else {
-			establish := snapshot.PidConnection[conn.Pid]
-			establish = append(establish, conn)
-			snapshot.PidConnection[conn.Pid] = establish
+			localPort := conn.Laddr.Port
 
-			snapshot.LocalPortPid[conn.Laddr.Port] = conn.Pid
+			snapshot.PortPid[localPort] = conn.Pid
 
-			array := snapshot.RemotePortConnection[conn.Raddr.Port]
-			snapshot.RemotePortConnection[conn.Raddr.Port] = append(array, conn)
+			snapshot.PortConnection[localPort] = conn
+
+			establish := snapshot.PidPort[conn.Pid]
+			snapshot.PidPort[conn.Pid] = append(establish, localPort)
+
 		}
 	}
 
@@ -137,9 +139,9 @@ func (s *Snapshot) Print() []byte {
 }
 
 func (s *Snapshot) Copy(snapshot *Snapshot, pid int32) {
-	s.PidConnection[pid] = snapshot.PidConnection[pid]
+	s.PidPort[pid] = snapshot.PidPort[pid]
 	s.PidProcess[pid] = snapshot.PidProcess[pid]
-	s.PidListen[pid] = snapshot.PidListen[pid]
+	s.PidListenPort[pid] = snapshot.PidListenPort[pid]
 
 	p := snapshot.PidProcess[pid]
 	s.CopyLite(snapshot, p.Parent)
@@ -151,5 +153,9 @@ func (s *Snapshot) Copy(snapshot *Snapshot, pid int32) {
 func (s *Snapshot) CopyLite(snapshot *Snapshot, pid int32) {
 
 	s.PidProcess[pid] = snapshot.PidProcess[pid]
-	s.PidListen[pid] = snapshot.PidListen[pid]
+	s.PidListenPort[pid] = snapshot.PidListenPort[pid]
+}
+
+func (s *Snapshot) GetConnections(port uint32) net.ConnectionStat {
+	return s.PortConnection[port]
 }
