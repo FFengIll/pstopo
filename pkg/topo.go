@@ -1,8 +1,11 @@
 package pkg
 
 import (
+	"fmt"
 	"github.com/shirou/gopsutil/v3/net"
 	"gonum.org/v1/gonum/graph"
+	gonet "net"
+	"strconv"
 )
 
 type PairID struct {
@@ -17,7 +20,9 @@ type PSTopo struct {
 	ProcessEdges       []*TopoEdge
 	NetworkEdges       []*TopoEdge
 	PublicNetworkEdges []*TopoEdge
-	Caches             map[int32]bool
+	PidCaches          map[int32]bool
+	ConnectionCaches   map[string]bool
+	HierarchyCaches    map[string]bool
 }
 
 type TopoNode Process
@@ -28,32 +33,80 @@ type TopoEdge struct {
 	Connection net.ConnectionStat
 }
 
+func NewTopo() *PSTopo {
+	return &PSTopo{
+		Nodes:              []*Process{},
+		NetworkEdges:       []*TopoEdge{},
+		PublicNetworkEdges: []*TopoEdge{},
+		ProcessEdges:       []*TopoEdge{},
+
+		PidCaches:        map[int32]bool{},
+		ConnectionCaches: map[string]bool{},
+		HierarchyCaches:  map[string]bool{},
+	}
+}
+
+func (t *TopoEdge) String() string {
+	return strconv.Itoa(int(t.From)) + "->" + strconv.Itoa(int(t.To))
+}
+
 func (this *PSTopo) LinkProcess(pid, pid2 int32) {
+	if pid == 0 || pid2 == 0 {
+		return
+	}
+	if pid == pid2 {
+		return
+	}
+
+	key := fmt.Sprintf("%d,%d", pid, pid2)
+	_, ok := this.HierarchyCaches[key]
+	if ok {
+		return
+	}
 	this.ProcessEdges = append(this.ProcessEdges,
 		&TopoEdge{
 			From: pid,
 			To:   pid2,
 		},
 	)
+	this.HierarchyCaches[key] = true
 }
 
 func (this *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
-	this.NetworkEdges = append(this.NetworkEdges,
-		&TopoEdge{
-			From:       pid,
-			To:         pid2,
-			Connection: conn,
-		},
-	)
+	if pid == 0 || pid2 == 0 {
+		return
+	}
+	if pid == pid2 {
+		return
+	}
+	if !isPrivateIP(gonet.ParseIP(conn.Raddr.IP)) {
+		this.LinkPublicNetwork(pid, conn)
+	} else {
+		_, ok := this.ConnectionCaches[conn.String()]
+		if ok {
+			return
+		}
+		this.NetworkEdges = append(this.NetworkEdges,
+			&TopoEdge{
+				From:       pid,
+				To:         pid2,
+				Connection: conn,
+			},
+		)
+		this.ConnectionCaches[conn.String()] = true
+	}
 }
 
 func (this *PSTopo) AddProcess(process *Process) {
+	if process.Pid == 0 {
+		return
+	}
 
-	if _, ok := this.Caches[process.Pid]; ok {
+	if _, ok := this.PidCaches[process.Pid]; ok {
 		return
 	}
 	this.Nodes = append(this.Nodes, process)
-	this.Caches[process.Pid] = true
+	this.PidCaches[process.Pid] = true
 }
 
 func (this *PSTopo) AddPid(pid int32) {
@@ -64,12 +117,22 @@ func (this *PSTopo) AddPid(pid int32) {
 }
 
 func (this *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
-	this.NetworkEdges = append(this.NetworkEdges,
+
+	if pid == 0 {
+		return
+	}
+	_, ok := this.ConnectionCaches[conn.String()]
+	if ok {
+		return
+	}
+	this.PublicNetworkEdges = append(this.PublicNetworkEdges,
 		&TopoEdge{
 			From:       pid,
 			Connection: conn,
 		},
 	)
+	this.ConnectionCaches[conn.String()] = true
+
 }
 
 func (this *PSTopo) AddPidNeighbor(pid int32) {
@@ -102,19 +165,56 @@ func (this *PSTopo) AddProcessNeighbor(process *Process) {
 	}
 }
 
-func makeTopoID(pid int32, port uint32) int64 {
-	var res int64 = int64(pid)
-	res |= int64(port) << 32
-	return res
-}
+func (topo *PSTopo) processPort(ports []uint32) {
+	snapshot := topo.Snapshot
+	listenPorts := []uint32{}
+	establishPorts := []uint32{}
+	for _, port := range ports {
+		_, ok := topo.Snapshot.ListenPortPid[port]
+		if ok {
+			listenPorts = append(listenPorts, port)
+		} else {
+			establishPorts = append(establishPorts, port)
+		}
+	}
 
-func NewTopo() *PSTopo {
-	return &PSTopo{
-		Nodes:              []*Process{},
-		NetworkEdges:       []*TopoEdge{},
-		PublicNetworkEdges: []*TopoEdge{},
-		ProcessEdges:       []*TopoEdge{},
-		Caches:             map[int32]bool{},
+	for _, port := range listenPorts {
+		// listen Port
+		listenPort := port
+		listenPid, _ := snapshot.ListenPortPid[listenPort]
+		connections := snapshot.ListenPortConnections[listenPort]
+		for _, conn := range connections {
+			connPort := conn.Laddr.Port
+			connPid, ok := snapshot.PortPid[connPort]
+			if ok {
+				topo.AddPid(listenPid)
+				topo.AddPid(connPid)
+				topo.LinkNetwork(connPid, listenPid, conn)
+			}
+
+		}
+	}
+
+	for _, connPort := range establishPorts {
+		// establish Port
+		connPid, ok := snapshot.PortPid[connPort]
+		if ok {
+			conn := snapshot.GetConnections(connPort)
+			if conn.Laddr.Port == connPort { //redundant
+				remoteIP, remotePort := conn.Raddr.IP, conn.Raddr.Port
+				if !isPrivateIP(gonet.ParseIP(remoteIP)) {
+					// remote is external ip
+					topo.LinkPublicNetwork(connPid, conn)
+				} else {
+					// remote is process
+					remotePid, ok := snapshot.PortPid[remotePort]
+					if ok {
+						topo.LinkNetwork(connPid, remotePid, conn)
+					}
+
+				}
+			}
+		}
 	}
 }
 
