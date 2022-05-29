@@ -23,9 +23,9 @@ type PSTopo struct {
 type TopoNode Process
 
 type TopoEdge struct {
-	From        int32
-	To          int32
-	Connnetcion net.ConnectionStat
+	From       int32
+	To         int32
+	Connection net.ConnectionStat
 }
 
 func (this *PSTopo) LinkProcess(pid, pid2 int32) {
@@ -40,9 +40,9 @@ func (this *PSTopo) LinkProcess(pid, pid2 int32) {
 func (this *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	this.NetworkEdges = append(this.NetworkEdges,
 		&TopoEdge{
-			From:        pid,
-			To:          pid2,
-			Connnetcion: conn,
+			From:       pid,
+			To:         pid2,
+			Connection: conn,
 		},
 	)
 }
@@ -66,8 +66,8 @@ func (this *PSTopo) AddPid(pid int32) {
 func (this *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	this.NetworkEdges = append(this.NetworkEdges,
 		&TopoEdge{
-			From:        pid,
-			Connnetcion: conn,
+			From:       pid,
+			Connection: conn,
 		},
 	)
 }
