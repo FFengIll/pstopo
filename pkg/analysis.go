@@ -2,7 +2,6 @@ package pkg
 
 import (
 	_ "gopkg.in/yaml.v3"
-	"net"
 	"strings"
 )
 
@@ -62,49 +61,10 @@ func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 			for _, port := range snapshot.PidPort[pid] {
 				ports = append(ports, port)
 			}
-
 		}
+
 		// process Port
-		for _, port := range ports {
-			// listen Port
-			listenPort := port
-			listenPid, ok := snapshot.ListenPortPid[listenPort]
-			if ok {
-				connections := snapshot.ListenPortConnections[listenPort]
-				for _, conn := range connections {
-					connPort := conn.Laddr.Port
-					connPid, ok := snapshot.PortPid[connPort]
-					if ok {
-						topo.AddPid(listenPid)
-						topo.AddPid(connPid)
-						topo.LinkNetwork(connPid, listenPid, conn)
-					}
-				}
-				continue
-			}
-
-			// establish Port
-			connPort := port
-			connPid, ok := snapshot.PortPid[connPort]
-			if ok {
-				conn := snapshot.GetConnections(connPort)
-				if conn.Laddr.Port == connPort { //redundant
-					listenIP, listenPort := conn.Raddr.IP, conn.Raddr.Port
-
-					if !isPrivateIP(net.IP(listenIP)) {
-						// remote is external ip
-						topo.LinkPublicNetwork(connPid, conn)
-					} else {
-						// remote is process
-						listenPid, ok := snapshot.ListenPortPid[listenPort]
-						if ok {
-							topo.LinkNetwork(connPid, listenPid, conn)
-						}
-
-					}
-				}
-			}
-		}
+		topo.processPort(ports)
 	}
 
 	return topo
