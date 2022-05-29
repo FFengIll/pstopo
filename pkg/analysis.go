@@ -2,108 +2,163 @@ package pkg
 
 import (
 	_ "gopkg.in/yaml.v3"
+	"net"
 	"strings"
 )
 
 type FilterOption struct {
-	all     bool
-	process []string
-	port    []uint32
-	pid     []int32
+	All  bool
+	Cmd  []string `json:"cmd"`
+	Port []uint32 `json:"port"`
+	Pid  []int32  `json:"pid"`
 }
 
 func NewGroup() *FilterOption {
 	return &FilterOption{
-		true,
-		make([]string, 3),
-		make([]uint32, 3),
-		make([]int32, 3),
+		Cmd:  []string{},
+		Port: []uint32{},
+		Pid:  []int32{},
 	}
 }
 
-func AnalyseSnapshot(snapshot *Snapshot) *PSTopo {
+func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 	topo := NewTopo()
+	topo.Snapshot = snapshot
 
-	for pid, process := range snapshot.PidProcess {
-		topo.AddProcess(process)
-		for _, child := range process.Children {
-			childProcess := snapshot.PidProcess[child]
-			topo.LinkProcess(pid, child)
-			topo.AddProcess(childProcess)
+	if options.All {
+		TopoAll(snapshot, topo)
+	} else {
+		pids := []int32{}
+		ports := []uint32{}
+		for _, pid := range options.Pid {
+			pids = append(pids, pid)
 		}
-		parentProcess := snapshot.PidProcess[process.Parent]
-		topo.LinkProcess(process.Parent, pid)
-		topo.AddProcess(parentProcess)
-	}
-	for pid, connections := range snapshot.PidConnection {
-		for _, c := range connections {
-			otherPid := snapshot.ConnectionPortPid[c.Raddr.Port]
-			topo.LinkNetwork(pid, c.Laddr.Port, otherPid, c.Raddr.Port)
+		for _, name := range options.Cmd {
+			for _, p := range snapshot.Processes() {
+				if strings.Contains(p.Cmdline, name) {
+					pids = append(pids, p.Pid)
+				}
+			}
+		}
+		for _, port := range options.Port {
+			for listenPort, pid := range snapshot.ListenPortPid {
+				if port == listenPort {
+					pids = append(pids, pid)
+				}
+			}
+			ports = append(ports, port)
+		}
+
+		// analyse with pids and ports
+		// process Pid
+		for _, pid := range pids {
+			topo.AddPid(pid)
+			topo.AddPidNeighbor(pid)
+
+			// add their ports
+			for _, conn := range snapshot.PidListen[pid] {
+				ports = append(ports, conn.Laddr.Port)
+			}
+			for _, conn := range snapshot.PidConnection[pid] {
+				ports = append(ports, conn.Laddr.Port)
+			}
+
+		}
+		// process Port
+		for _, port := range ports {
+			// listen Port
+			listenPort := port
+			listenPid, ok := snapshot.ListenPortPid[listenPort]
+			if ok {
+				connections := snapshot.RemotePortConnection[listenPort]
+				for _, conn := range connections {
+					connPort := conn.Laddr.Port
+					connPid, ok := snapshot.LocalPortPid[connPort]
+					if ok {
+						topo.AddPid(listenPid)
+						topo.AddPid(connPid)
+						topo.LinkNetwork(connPid, listenPid, conn)
+					}
+				}
+				continue
+			}
+
+			// establish Port
+			connPort := port
+			connPid, ok := snapshot.LocalPortPid[connPort]
+			if ok {
+				connections := snapshot.PidConnection[connPid]
+				for _, conn := range connections {
+					if conn.Laddr.Port == connPort {
+						listenIP, listenPort := conn.Raddr.IP, conn.Raddr.Port
+
+						if !isPrivateIP(net.IP(listenIP)) {
+							// remote is external ip
+							topo.LinkPublicNetwork(connPid, conn)
+						} else {
+							// remote is process
+							listenPid, ok := snapshot.ListenPortPid[listenPort]
+							if ok {
+								topo.LinkNetwork(connPid, listenPid, conn)
+							}
+
+						}
+
+					}
+				}
+			}
 		}
 	}
+
 	return topo
 }
 
-func FilterSnapshot(options *FilterOption, snapshot *Snapshot) *Snapshot {
-	if options.all {
-		res := snapshot
-		return res
+func TopoAll(snapshot *Snapshot, topo *PSTopo) {
+	for pid, process := range snapshot.PidProcess {
+		topo.AddProcess(process)
+		topo.AddPidNeighbor(pid)
 	}
-	pids := []int32{}
-	for _, pid := range options.pid {
-		pids = append(pids, pid)
-	}
-	for _, name := range options.process {
-		for _, p := range snapshot.Processes() {
-			if strings.Contains(p.Cmdline, name) {
-				pids = append(pids, p.Pid)
-			}
+	for pid, connections := range snapshot.PidConnection {
+		for _, conn := range connections {
+			otherPid := snapshot.LocalPortPid[conn.Raddr.Port]
+			topo.LinkNetwork(pid, otherPid, conn)
 		}
 	}
-	for _, port := range options.port {
-		for listenPort, pid := range snapshot.ListenPortPid {
-			if port == listenPort {
-				pids = append(pids, pid)
-			}
-		}
-	}
-
-	return snapshot
 }
 
 func dummy() {
 
 	//res := NewGroup()
 	//
-	//// get all Pid
-	//pids, err := process.PidsWithContext(context.Background())
+	//// get All Pid
+	//pids, err := Cmd.PidsWithContext(context.Background())
 	//if err != nil {
 	//	return nil
 	//}
-	//for _, pid := range pids {
-	//	for _, target := range group.pid {
-	//		if pid == target {
-	//			res.pid = append(res.pid, target)
+	//for _, Pid := range pids {
+	//	for _, target := range group.Pid {
+	//		if Pid == target {
+	//			res.Pid = append(res.Pid, target)
 	//		}
 	//	}
 	//}
 	//
-	//// get each process
-	//ps := make([]*process.Process, 10)
-	//for _, pid := range pids {
-	//	p, _ := process.NewProcessWithContext(context.Background(), pid)
+	//// get each Cmd
+	//ps := make([]*Cmd.Process, 10)
+	//for _, Pid := range pids {
+	//	p, _ := Cmd.NewProcessWithContext(context.Background(), Pid)
 	//	cmdline, _ := p.Cmdline()
-	//	for _, target := range group.process {
+	//	for _, target := range group.Cmd {
 	//		if strings.Contains(cmdline, target) {
 	//			ps = append(ps, p)
-	//			res.process = append(res.process, target)
+	//			res.Cmd = append(res.Cmd, target)
 	//		}
 	//	}
 	//}
 	//
 	//// get each by Port
-	//for _, pid := range pids {
-	//	connections, err := net.ConnectionsPid("ESTABLISHED", pid)
+	//for _, Pid := range pids {
+	//	connections, err := net.ConnectionsPid("ESTABLISHED", Pid)
 	//	if err != nil {
 	//		return nil
 	//	}
