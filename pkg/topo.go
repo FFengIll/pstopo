@@ -165,11 +165,11 @@ func (this *PSTopo) AddProcessNeighbor(process *Process) {
 	}
 }
 
-func (topo *PSTopo) processPort(ports []uint32) {
+func (topo *PSTopo) processPort(ports map[uint32]bool) {
 	snapshot := topo.Snapshot
 	listenPorts := []uint32{}
 	establishPorts := []uint32{}
-	for _, port := range ports {
+	for port, _ := range ports {
 		_, ok := topo.Snapshot.ListenPortPid[port]
 		if ok {
 			listenPorts = append(listenPorts, port)

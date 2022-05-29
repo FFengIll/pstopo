@@ -27,39 +27,42 @@ func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
 	if options.All {
 		TopoAll(snapshot, topo)
 	} else {
-		pids := []int32{}
-		ports := []uint32{}
+		pids := map[int32]bool{}
+		ports := map[uint32]bool{}
 		for _, pid := range options.Pid {
-			pids = append(pids, pid)
+			pids[pid] = true
 		}
 		for _, name := range options.Cmd {
 			for _, p := range snapshot.Processes() {
 				if strings.Contains(p.Cmdline, name) {
-					pids = append(pids, p.Pid)
+					pids[p.Pid] = true
+					for _, c := range p.Children {
+						pids[c] = true
+					}
 				}
 			}
 		}
 		for _, port := range options.Port {
 			for listenPort, pid := range snapshot.ListenPortPid {
 				if port == listenPort {
-					pids = append(pids, pid)
+					pids[pid] = true
 				}
 			}
-			ports = append(ports, port)
+			ports[port] = true
 		}
 
 		// analyse with pids and ports
 		// process Pid
-		for _, pid := range pids {
+		for pid, _ := range pids {
 			topo.AddPid(pid)
 			topo.AddPidNeighbor(pid)
 
 			// add their ports
 			for _, port := range snapshot.PidListenPort[pid] {
-				ports = append(ports, port)
+				ports[port] = true
 			}
 			for _, port := range snapshot.PidPort[pid] {
-				ports = append(ports, port)
+				ports[port] = true
 			}
 		}
 
