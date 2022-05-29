@@ -25,20 +25,32 @@ var rootCmd = &cobra.Command{
 				panic(err)
 			}
 		}
-		snapshotFiltered := pkg.FilterSnapshot(filterOption, snapshot)
-		topo := pkg.AnalyseSnapshot(snapshotFiltered)
-		render, _ := pkg.NewRender(topo, snapshotFiltered)
+		var topo *pkg.PSTopo
+		if topoConfig != "" {
+			var json = jsoniter.ConfigCompatibleWithStandardLibrary
+			data, _ := ioutil.ReadFile(topoConfig)
+			err := json.Unmarshal(data, &filterOption)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			filterOption.All = true
+		}
+		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
+		render, _ := pkg.NewRender(topo, snapshot)
 		render.Write()
 	},
 }
 
 var cachedSnapshot = ""
+var topoConfig = ""
 
 func init() {
 	rootCmd.AddCommand(snapshotCmd)
 
 	flags := rootCmd.PersistentFlags()
 	flags.StringVarP(&cachedSnapshot, "snapshot", "s", "snapshot.json", "local cached snapshot file path")
+	flags.StringVarP(&topoConfig, "topo", "t", "topo.json", "local topo config file path")
 }
 
 func main() {
