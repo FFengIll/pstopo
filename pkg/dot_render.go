@@ -181,14 +181,15 @@ func (this *Render) Data() *dotGraphData {
 
 		parts := map[int]string{}
 		related := relatedPidPorts[n.Pid]
-		for _, port := range topo.Snapshot.PidListenPort[n.Pid] {
-			if contains(related, port) {
-				parts[int(port)] = "Listen " + ":" + strconv.Itoa(int(port))
-			}
-		}
 		for _, port := range topo.Snapshot.PidPort[n.Pid] {
 			if contains(related, port) {
 				parts[int(port)] = ":" + strconv.Itoa(int(port))
+			}
+		}
+		// put listen bellow to avoid overwrite
+		for _, port := range topo.Snapshot.PidListenPort[n.Pid] {
+			if contains(related, port) {
+				parts[int(port)] = "Listen " + ":" + strconv.Itoa(int(port))
 			}
 		}
 
@@ -223,7 +224,7 @@ func (this *Render) Data() *dotGraphData {
 		node := &dotNode{
 			ID: id,
 			Attrs: dotAttrs{
-				"label": ip,
+				"label": ip + ":" + strconv.Itoa(int(e.Connection.Raddr.Port)),
 				"shape": "box3d",
 			},
 		}

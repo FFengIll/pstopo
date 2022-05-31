@@ -26,6 +26,7 @@ const tmplGraph = `digraph gocallvis {
     fontname="Arial";
     fontsize="14";
     // rankdir="{{.Options.rankdir}}";
+	rankdir="LR";
     bgcolor="lightgray";
     style="solid";
     penwidth="0.5";
