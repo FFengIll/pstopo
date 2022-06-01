@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 )
 
 type Render struct {
@@ -114,9 +115,9 @@ func NewRender(topo *PSTopo, snapshot *Snapshot) (*Render, error) {
 	return &Render{g, graph, topo}, nil
 }
 
-func (this *Render) Write() {
+func (this *Render) Write(output string) {
 	t := template.New("dot")
-	for _, s := range []string{tmplCluster, tmplNode, tmplEdge, tmplGraph} {
+	for _, s := range []string{tmpLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
 		if _, err := t.Parse(s); err != nil {
 			panic(err)
 		}
@@ -132,7 +133,13 @@ func (this *Render) Write() {
 		panic(err)
 	}
 	// FIXME: use parsed graph, not this.graph
-	if err := this.g.RenderFilename(graph, graphviz.Format(graphviz.DOT), "./test.dot"); err != nil {
+	if !strings.HasSuffix(output, ".dot") {
+		output = output + ".dot"
+	}
+	if err := this.g.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
+		panic(err)
+	}
+	if err := this.g.RenderFilename(graph, graphviz.Format(graphviz.PNG), output+".png"); err != nil {
 		panic(err)
 	}
 }
@@ -220,7 +227,7 @@ func (this *Render) Data() *dotGraphData {
 	}
 	for _, e := range topo.PublicNetworkEdges {
 		ip := e.Connection.Raddr.IP
-		id := "ip" + strings.ReplaceAll(ip, ".", "_")
+		id := "ip" + replaceIPChar(ip)
 		node := &dotNode{
 			ID: id,
 			Attrs: dotAttrs{
@@ -238,8 +245,9 @@ func (this *Render) Data() *dotGraphData {
 		edges = append(edges, edge)
 	}
 
+	now := time.Now()
 	return &dotGraphData{
-		Title: "test",
+		Title: fmt.Sprintf("%s (%s %s)", "PSTopo", now.Format("2006-01-02"), now.Format("15:04")),
 		Nodes: nodes,
 		Edges: edges,
 	}
