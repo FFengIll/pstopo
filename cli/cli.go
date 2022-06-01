@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/FFengIll/pstopo/pkg"
 	jsoniter "github.com/json-iterator/go"
@@ -15,16 +16,27 @@ var rootCmd = &cobra.Command{
 		filterOption := pkg.NewGroup()
 		//log := logrus.StandardLogger()
 		var snapshot *pkg.Snapshot
-		if cachedSnapshot == "" {
+		if snapshotPath == "" {
+			// if no given snapshot, then generate a new one
+			snapshotPath = "snapshot.json"
 			snapshot, _ = pkg.TakeSnapshot()
+			snapshot.DumpFile(snapshotPath)
 		} else {
-			var json = jsoniter.ConfigCompatibleWithStandardLibrary
-			data, _ := ioutil.ReadFile(cachedSnapshot)
-			err := json.Unmarshal(data, &snapshot)
-			if err != nil {
-				panic(err)
+			file, err := os.Open(snapshotPath)
+			defer file.Close()
+			if errors.Is(err, os.ErrNotExist) {
+				snapshot, _ = pkg.TakeSnapshot()
+				snapshot.DumpFile(snapshotPath)
+			} else {
+				var json = jsoniter.ConfigCompatibleWithStandardLibrary
+				data, _ := ioutil.ReadFile(snapshotPath)
+				err := json.Unmarshal(data, &snapshot)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
+
 		var topo *pkg.PSTopo
 		if topoConfig != "" {
 			var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -38,19 +50,21 @@ var rootCmd = &cobra.Command{
 		}
 		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
 		render, _ := pkg.NewRender(topo, snapshot)
-		render.Write()
+		render.Write(outputPath)
 	},
 }
 
-var cachedSnapshot = ""
+var snapshotPath = ""
 var topoConfig = ""
+var outputPath = ""
 
 func init() {
 	rootCmd.AddCommand(snapshotCmd)
 
 	flags := rootCmd.PersistentFlags()
-	flags.StringVarP(&cachedSnapshot, "snapshot", "s", "snapshot.json", "local cached snapshot file path")
+	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
 	flags.StringVarP(&topoConfig, "topo", "t", "topo.json", "local topo config file path")
+	flags.StringVarP(&outputPath, "output", "o", "output.dot", "output file path")
 }
 
 func main() {
