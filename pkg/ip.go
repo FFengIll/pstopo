@@ -3,6 +3,7 @@ package pkg
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 var privateIPBlocks []*net.IPNet
@@ -37,4 +38,11 @@ func isPrivateIP(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+func replaceIPChar(ip string) string {
+	var res = ""
+	res = strings.ReplaceAll(ip, ".", "_")
+	res = strings.ReplaceAll(res, ":", "_")
+	return res
 }
