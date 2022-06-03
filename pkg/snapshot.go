@@ -119,6 +119,12 @@ func (s *Snapshot) Processes() []*Process {
 }
 
 func (s *Snapshot) DumpFile(filepath string) {
+	log := logrus.New()
+	if strings.Compare(filepath, "") == 0 {
+		now := time.Now()
+		filepath = fmt.Sprintf("snapshot-%s-%d-%d.json", now.Format("2006-02-01"), now.Hour()*60+now.Minute(), now.Second())
+	}
+	log.Infof("snapshot to: %s", filepath)
 	bytes := s.Dump()
 	err := ioutil.WriteFile(filepath, bytes, 0644)
 	if err != nil {
