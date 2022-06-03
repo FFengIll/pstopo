@@ -33,8 +33,10 @@ type TopoEdge struct {
 	Connection net.ConnectionStat
 }
 
-func NewTopo() *PSTopo {
+func NewTopo(snapshot *Snapshot) *PSTopo {
 	return &PSTopo{
+		Snapshot: snapshot,
+
 		Nodes:              []*Process{},
 		NetworkEdges:       []*TopoEdge{},
 		PublicNetworkEdges: []*TopoEdge{},

@@ -33,17 +33,19 @@ const tmplNode = `{{define "node" -}}
 {{- end}}`
 
 const tmplGraph = `digraph pstopo {
-    label="{{.Title}}";
-    labeljust="t";
-	labelloc=t;
-    fontname="Arial";
-    fontsize="25";
-    // rankdir="{{.Options.rankdir}}";
-	rankdir="LR";
-    bgcolor="lightgray";
-    style="solid";
-    penwidth="0.5";
-    pad="0.0";
+	graph [
+		label="{{.Title}}";
+		labeljust="t";
+		labelloc=t;
+		fontname="Arial";
+		fontsize="25";
+		// rankdir="{{.Options.rankdir}}";
+		rankdir="LR";
+		bgcolor="lightgray";
+		style="solid";
+		penwidth="0.5";
+		pad="0.0";
+	]
     // nodesep="{{.Options.nodesep}}";
     // node [shape="{{.Options.nodeshape}}" style="{{.Options.nodestyle}}" fillcolor="honeydew" fontname="Verdana" penwidth="1.0" margin="0.05,0.0"];
     // edge [minlen="{{.Options.minlen}}"]

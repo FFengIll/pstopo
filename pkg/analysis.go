@@ -12,7 +12,7 @@ type FilterOption struct {
 	Pid  []int32  `json:"pid"`
 }
 
-func NewGroup() *FilterOption {
+func NewFilterOption() *FilterOption {
 	return &FilterOption{
 		Cmd:  []string{},
 		Port: []uint32{},
@@ -21,8 +21,7 @@ func NewGroup() *FilterOption {
 }
 
 func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
-	topo := NewTopo()
-	topo.Snapshot = snapshot
+	topo := NewTopo(snapshot)
 
 	if options.All {
 		TopoAll(snapshot, topo)

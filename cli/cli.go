@@ -13,12 +13,11 @@ import (
 var rootCmd = &cobra.Command{
 	Use: "root",
 	Run: func(cmd *cobra.Command, args []string) {
-		filterOption := pkg.NewGroup()
+		filterOption := pkg.NewFilterOption()
 		//log := logrus.StandardLogger()
 		var snapshot *pkg.Snapshot
 		if snapshotPath == "" {
 			// if no given snapshot, then generate a new one
-			snapshotPath = "snapshot.json"
 			snapshot, _ = pkg.TakeSnapshot()
 			snapshot.DumpFile(snapshotPath)
 		} else {
@@ -49,7 +48,7 @@ var rootCmd = &cobra.Command{
 			filterOption.All = true
 		}
 		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
-		render, _ := pkg.NewRender(topo, snapshot)
+		render, _ := pkg.NewRender(snapshot, topo)
 		render.Write(outputPath)
 	},
 }

@@ -21,5 +21,5 @@ var snapshotFilepath = ""
 
 func init() {
 	flags := snapshotCmd.PersistentFlags()
-	flags.StringVarP(&snapshotFilepath, "output", "o", "snapshot.json", "cache snapshot to file")
+	flags.StringVarP(&snapshotFilepath, "output", "o", "", "cache snapshot to file")
 }

@@ -19,21 +19,6 @@ type Render struct {
 	topo  *PSTopo
 }
 
-type dotLabel struct {
-	parts map[int]string
-}
-
-// use dot `record` shape for node
-func (d dotLabel) String() string {
-	var records []string
-	for id, label := range d.parts {
-		records = append(records, fmt.Sprintf("<p%d> %s", id, label))
-	}
-
-	internal := strings.Join(records, " | ")
-	return fmt.Sprintf("{%s}", internal)
-}
-
 type dotNode struct {
 	ID    string
 	Label string
@@ -43,16 +28,18 @@ type dotNode struct {
 type dotEdge struct {
 	From  string
 	To    string
+	Label string
 	Attrs dotAttrs
 }
 
 func newDotEdge() *dotEdge {
 	return &dotEdge{
+		Label: "",
 		Attrs: dotAttrs{},
 	}
 }
 func (e dotEdge) String() string {
-	return fmt.Sprintf("%s -> %s [ label=\"%s\", %s ]", e.From, e.To, "", e.Attrs)
+	return fmt.Sprintf("%s -> %s [ label=\"%s\", %s ]", e.From, e.To, e.Label, e.Attrs)
 }
 
 func (n dotNode) String() string {
@@ -87,7 +74,7 @@ func (p dotAttrs) Lines() string {
 	return fmt.Sprintf("%s;", strings.Join(p.List(), ";\n"))
 }
 
-func NewRender(topo *PSTopo, snapshot *Snapshot) (*Render, error) {
+func NewRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
 	g := graphviz.New()
 	graph, _ := g.Graph()
 
@@ -201,7 +188,7 @@ func (this *Render) Data() *dotGraphData {
 		}
 
 		paths := strings.Split(n.Exec, string(os.PathSeparator))
-		label := makeLabel(parts, paths[len(paths)-1], strconv.Itoa(int(n.Pid)))
+		label := makeDotLabDoel(parts, paths[len(paths)-1], strconv.Itoa(int(n.Pid)))
 		node.Label = label
 
 		nodes = append(nodes, node)
@@ -264,7 +251,7 @@ func makeDotId(pid int32) string {
 	return "n" + strconv.Itoa(int(pid))
 }
 
-func makeLabel(parts map[int]string, items ...string) string {
+func makeDotLabDoel(parts map[int]string, items ...string) string {
 	var records []string = items
 	for id, label := range parts {
 		records = append(records, fmt.Sprintf("<p%d> %s", id, label))
@@ -272,10 +259,4 @@ func makeLabel(parts map[int]string, items ...string) string {
 
 	internal := strings.Join(records, " | ")
 	return fmt.Sprintf("%s", internal)
-}
-
-func NewDotLabel() *dotLabel {
-	return &dotLabel{
-		parts: map[int]string{},
-	}
 }
