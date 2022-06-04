@@ -9,6 +9,10 @@ Generate topo of process, including process status, port, ~~fd~~ and etc.
   - connection info (listen port and host)
   - etc.
 
+# sample
+
+![](sample/output.dot.png)
+
 # usage
 ## topo
 Creating a topo can work with process name, port number or pid number.
