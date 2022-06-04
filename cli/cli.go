@@ -3,15 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/FFengIll/pstopo/pkg"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
 )
 
 var rootCmd = &cobra.Command{
-	Use: "root",
+	Use:  "root",
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		filterOption := pkg.NewFilterOption()
 		//log := logrus.StandardLogger()
@@ -45,8 +49,25 @@ var rootCmd = &cobra.Command{
 				panic(err)
 			}
 		} else {
-			filterOption.All = true
+			if len(args) <= 0 {
+				filterOption.All = true
+			} else {
+				filterOption.All = false
+			}
 		}
+
+		// add filter options from cli
+		for _, arg := range args {
+			// :xx as port
+			// yy as cmdline
+			if strings.HasPrefix(arg, ":") {
+				port, _ := strconv.Atoi(arg[1:])
+				filterOption.Port = append(filterOption.Port, uint32(port))
+			} else {
+				filterOption.Cmd = append(filterOption.Cmd, arg)
+			}
+		}
+
 		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
 		render, _ := pkg.NewRender(snapshot, topo)
 		render.Write(outputPath)
@@ -62,7 +83,7 @@ func init() {
 
 	flags := rootCmd.PersistentFlags()
 	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
-	flags.StringVarP(&topoConfig, "topo", "t", "topo.json", "local topo config file path")
+	flags.StringVarP(&topoConfig, "topo", "t", "", "local topo config file path")
 	flags.StringVarP(&outputPath, "output", "o", "output.dot", "output file path")
 }
 
