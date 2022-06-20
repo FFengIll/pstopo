@@ -234,7 +234,7 @@ func (this *Render) Data() *dotGraphData {
 
 	now := time.Now()
 	return &dotGraphData{
-		Title: fmt.Sprintf("%s (%s %s)", "PSTopo", now.Format("2006-01-02"), now.Format("15:04")),
+		Title: fmt.Sprintf("%s (%s)", "PSTopo", now.Format(time.RFC3339)),
 		Nodes: nodes,
 		Edges: edges,
 	}
