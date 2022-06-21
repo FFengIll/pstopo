@@ -28,6 +28,7 @@ type dotNode struct {
 type dotEdge struct {
 	From  string
 	To    string
+	Edge  string
 	Label string
 	Attrs dotAttrs
 }
@@ -35,11 +36,12 @@ type dotEdge struct {
 func newDotEdge() *dotEdge {
 	return &dotEdge{
 		Label: "",
+		Edge:  "->",
 		Attrs: dotAttrs{},
 	}
 }
 func (e dotEdge) String() string {
-	return fmt.Sprintf("%s -> %s [ label=\"%s\", %s ]", e.From, e.To, e.Label, e.Attrs)
+	return fmt.Sprintf("%s %s %s [ label=\"%s\", %s ]", e.From, e.Edge, e.To, e.Label, e.Attrs)
 }
 
 func (n dotNode) String() string {
@@ -74,7 +76,7 @@ func (p dotAttrs) Lines() string {
 	return fmt.Sprintf("%s;", strings.Join(p.List(), ";\n"))
 }
 
-func NewRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
+func NewDotRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
 	g := graphviz.New()
 	graph, _ := g.Graph()
 
@@ -140,6 +142,10 @@ func contains(lst []uint32, item uint32) bool {
 	return false
 }
 
+func makeDotPortLabel(label string, dotPort string) string {
+	return fmt.Sprintf("<p%s> %s", dotPort, label)
+}
+
 func (this *Render) Data() *dotGraphData {
 	topo := this.topo
 	snapshot := this.topo.Snapshot
@@ -174,6 +180,7 @@ func (this *Render) Data() *dotGraphData {
 		}
 
 		parts := map[int]string{}
+
 		related := relatedPidPorts[n.Pid]
 		for _, port := range topo.Snapshot.PidPort[n.Pid] {
 			if contains(related, port) {
@@ -188,7 +195,8 @@ func (this *Render) Data() *dotGraphData {
 		}
 
 		paths := strings.Split(n.Exec, string(os.PathSeparator))
-		label := makeDotLabDoel(parts, paths[len(paths)-1], strconv.Itoa(int(n.Pid)))
+		pidLabel := makeDotPortLabel(strconv.Itoa(int(n.Pid)), "0")
+		label := makeDotLabel(parts, paths[len(paths)-1], pidLabel)
 		node.Label = label
 
 		nodes = append(nodes, node)
@@ -198,18 +206,19 @@ func (this *Render) Data() *dotGraphData {
 
 	for _, e := range topo.ProcessEdges {
 		edge := newDotEdge()
-		edge.From = makeDotId(e.From) + makeDotPort(e.Connection.Laddr.Port)
-		edge.To = makeDotId(e.To) + makeDotPort(e.Connection.Raddr.Port)
+		edge.From = toDotId(e.From) + toDotPort(0)
+		edge.To = toDotId(e.To) + toDotPort(0)
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "red"
 		edges = append(edges, edge)
 	}
 	for _, e := range topo.NetworkEdges {
 		edge := newDotEdge()
-		edge.From = makeDotId(e.From) + makeDotPort(e.Connection.Laddr.Port)
-		edge.To = makeDotId(e.To) + makeDotPort(e.Connection.Raddr.Port)
+		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
+		edge.To = toDotId(e.To) + toDotPort(e.Connection.Raddr.Port)
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "green"
+		edge.Attrs["dir"] = "both"
 		edges = append(edges, edge)
 	}
 	for _, e := range topo.PublicNetworkEdges {
@@ -227,7 +236,8 @@ func (this *Render) Data() *dotGraphData {
 		edge := newDotEdge()
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "blue"
-		edge.From = makeDotId(e.From) + makeDotPort(e.Connection.Laddr.Port)
+		edge.Attrs["dir"] = "both"
+		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = id
 		edges = append(edges, edge)
 	}
@@ -240,21 +250,18 @@ func (this *Render) Data() *dotGraphData {
 	}
 }
 
-func makeDotPort(port uint32) string {
-	if port == 0 {
-		return ""
-	}
+func toDotPort(port uint32) string {
 	return ":" + "p" + strconv.Itoa(int(port))
 }
 
-func makeDotId(pid int32) string {
+func toDotId(pid int32) string {
 	return "n" + strconv.Itoa(int(pid))
 }
 
-func makeDotLabDoel(parts map[int]string, items ...string) string {
+func makeDotLabel(parts map[int]string, items ...string) string {
 	var records []string = items
 	for id, label := range parts {
-		records = append(records, fmt.Sprintf("<p%d> %s", id, label))
+		records = append(records, makeDotPortLabel(label, strconv.Itoa(id)))
 	}
 
 	internal := strings.Join(records, " | ")

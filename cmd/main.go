@@ -69,7 +69,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
-		render, _ := pkg.NewRender(snapshot, topo)
+		render, _ := pkg.NewDotRender(snapshot, topo)
 		render.Write(outputPath)
 	},
 }

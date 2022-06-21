@@ -5,8 +5,8 @@ const tmpLegend = `{{define "legend" -}}
     label = "Legend";
 	graph [shape=box, fontsize=25]
 	node [shape="box"]
-    process->socket [color=green, label="socket connection"]
-    process->ip_port [color=blue, label="connection to ip"]
+    process->socket [color=green, label="socket connection", dir="both"]
+    process->ip_port [color=blue, label="connection to ip", dir="both"]
     process->child_pid [color=red, label="process hierarchy"]
     process [label="executable | pid, e.g. 23333 | colon port, e.g. :8080", shape=record]
   }
