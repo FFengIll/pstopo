@@ -3,13 +3,14 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"strings"
+	"time"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"strings"
-	"time"
 )
 
 type Snapshot struct {
@@ -123,7 +124,7 @@ func (s *Snapshot) DumpFile(filepath string) {
 	log := logrus.New()
 	if strings.Compare(filepath, "") == 0 {
 		now := time.Now()
-		filepath = fmt.Sprintf("snapshot-%s-%02d:%02d:%02d.json", now.Format("2006-01-02"), now.Hour(), now.Minute(), now.Second())
+		filepath = fmt.Sprintf("%s-%02d:%02d:%02d.snapshot.json", now.Format("2006-01-02"), now.Hour(), now.Minute(), now.Second())
 	}
 	log.Infof("snapshot to: %s", filepath)
 	bytes := s.Dump()

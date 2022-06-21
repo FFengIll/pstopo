@@ -23,13 +23,21 @@ var rootCmd = &cobra.Command{
 		if snapshotPath == "" {
 			// if no given snapshot, then generate a new one
 			snapshot, _ = pkg.TakeSnapshot(connectionKind)
-			snapshot.DumpFile(snapshotPath)
+			if outputPath != "" {
+				snapshot.DumpFile(outputPath + ".snapshot.json")
+			} else {
+				snapshot.DumpFile(snapshotPath)
+			}
 		} else {
 			file, err := os.Open(snapshotPath)
 			defer file.Close()
 			if errors.Is(err, os.ErrNotExist) {
 				snapshot, _ = pkg.TakeSnapshot(connectionKind)
-				snapshot.DumpFile(snapshotPath)
+				if outputPath != "" {
+					snapshot.DumpFile(outputPath + ".snapshot.json")
+				} else {
+					snapshot.DumpFile(snapshotPath)
+				}
 			} else {
 				var json = jsoniter.ConfigCompatibleWithStandardLibrary
 				data, _ := ioutil.ReadFile(snapshotPath)
