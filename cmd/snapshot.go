@@ -13,7 +13,10 @@ var snapshotCmd = &cobra.Command{
 }
 
 func executeSnapshot() {
-	snapshot, _ := pkg.TakeSnapshot()
+	snapshot, err := pkg.TakeSnapshot(connectionKind)
+	if err != nil {
+		panic(err)
+	}
 	snapshot.DumpFile(snapshotFilepath)
 }
 
@@ -22,4 +25,5 @@ var snapshotFilepath = ""
 func init() {
 	flags := snapshotCmd.PersistentFlags()
 	flags.StringVarP(&snapshotFilepath, "output", "o", "", "cache snapshot to file")
+	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
 }

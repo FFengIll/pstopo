@@ -22,13 +22,13 @@ var rootCmd = &cobra.Command{
 		var snapshot *pkg.Snapshot
 		if snapshotPath == "" {
 			// if no given snapshot, then generate a new one
-			snapshot, _ = pkg.TakeSnapshot()
+			snapshot, _ = pkg.TakeSnapshot(connectionKind)
 			snapshot.DumpFile(snapshotPath)
 		} else {
 			file, err := os.Open(snapshotPath)
 			defer file.Close()
 			if errors.Is(err, os.ErrNotExist) {
-				snapshot, _ = pkg.TakeSnapshot()
+				snapshot, _ = pkg.TakeSnapshot(connectionKind)
 				snapshot.DumpFile(snapshotPath)
 			} else {
 				var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -77,6 +77,7 @@ var rootCmd = &cobra.Command{
 var snapshotPath = ""
 var topoConfig = ""
 var outputPath = ""
+var connectionKind = ""
 
 func init() {
 	rootCmd.AddCommand(snapshotCmd)
@@ -85,6 +86,7 @@ func init() {
 	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
 	flags.StringVarP(&topoConfig, "topo", "t", "", "local topo config file path")
 	flags.StringVarP(&outputPath, "output", "o", "output.dot", "output file path")
+	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
 }
 
 func main() {

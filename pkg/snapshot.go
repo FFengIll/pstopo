@@ -39,12 +39,13 @@ func NewSnapshot() *Snapshot {
 	return &s
 }
 
-func TakeSnapshot() (*Snapshot, error) {
+func TakeSnapshot(kind string) (*Snapshot, error) {
 	snapshot := NewSnapshot()
 	log := logrus.StandardLogger()
 	log.Info("Take snapshot at {}", time.Now())
 	pids, err := process.PidsWithContext(context.Background())
 	if err != nil {
+		logrus.WithError(err).Warning("get pid error")
 		return nil, err
 	}
 	for _, pid := range pids {
@@ -74,9 +75,9 @@ func TakeSnapshot() (*Snapshot, error) {
 	}
 
 	// here, `gopsutil` use Pid=0 to fetch All connections
-	var kind = ""
 	connections, err := net.Connections(kind)
 	if err != nil {
+		logrus.WithError(err).Warning("get connection error")
 		return nil, err
 	}
 	for _, conn := range connections {
