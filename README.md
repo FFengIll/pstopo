@@ -11,7 +11,7 @@ Generate topo of process, including process status, port, ~~fd~~ and etc.
 
 # sample
 
-![](sample/output.dot.png)
+![](sample/docker.dot.png)
 
 # usage
 ## topo
