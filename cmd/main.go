@@ -3,6 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
+
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -13,54 +16,54 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func existFile(path string) bool {
+	file, err := os.Open(path)
+	defer file.Close()
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
 var rootCmd = &cobra.Command{
 	Use:  "root",
 	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		filterOption := pkg.NewFilterOption()
-		//log := logrus.StandardLogger()
+
+		config := pkg.NewConfig()
+
 		var snapshot *pkg.Snapshot
-		if snapshotPath == "" {
+		if snapshotPath == "" || !existFile(snapshotPath) {
+			logrus.WithField("snapshot", snapshotPath).Infoln("no snapshot existed, take one")
 			// if no given snapshot, then generate a new one
 			snapshot, _ = pkg.TakeSnapshot(connectionKind)
-			if outputPath != "" {
-				snapshot.DumpFile(outputPath + ".snapshot.json")
+			if outputName != "" {
+				snapshot.DumpFile(outputName + ".snapshot.json")
 			} else {
 				snapshot.DumpFile(snapshotPath)
 			}
 		} else {
-			file, err := os.Open(snapshotPath)
-			defer file.Close()
-			if errors.Is(err, os.ErrNotExist) {
-				snapshot, _ = pkg.TakeSnapshot(connectionKind)
-				if outputPath != "" {
-					snapshot.DumpFile(outputPath + ".snapshot.json")
-				} else {
-					snapshot.DumpFile(snapshotPath)
-				}
-			} else {
-				var json = jsoniter.ConfigCompatibleWithStandardLibrary
-				data, _ := ioutil.ReadFile(snapshotPath)
-				err := json.Unmarshal(data, &snapshot)
-				if err != nil {
-					panic(err)
-				}
+			var json = jsoniter.ConfigCompatibleWithStandardLibrary
+			data, _ := ioutil.ReadFile(snapshotPath)
+			err := json.Unmarshal(data, &snapshot)
+			if err != nil {
+				panic(err)
 			}
 		}
 
 		var topo *pkg.PSTopo
-		if topoConfig != "" {
-			var json = jsoniter.ConfigCompatibleWithStandardLibrary
-			data, _ := ioutil.ReadFile(topoConfig)
-			err := json.Unmarshal(data, &filterOption)
-			if err != nil {
-				panic(err)
+		if configPath == "" || !existFile(configPath) {
+			if len(args) <= 0 {
+				config.All = true
+			} else {
+				config.All = false
 			}
 		} else {
-			if len(args) <= 0 {
-				filterOption.All = true
-			} else {
-				filterOption.All = false
+			var json = jsoniter.ConfigCompatibleWithStandardLibrary
+			data, _ := ioutil.ReadFile(configPath)
+			err := json.Unmarshal(data, &config)
+			if err != nil {
+				panic(err)
 			}
 		}
 
@@ -70,31 +73,38 @@ var rootCmd = &cobra.Command{
 			// yy as cmdline
 			if strings.HasPrefix(arg, ":") {
 				port, _ := strconv.Atoi(arg[1:])
-				filterOption.Port = append(filterOption.Port, uint32(port))
-			} else {
-				filterOption.Cmd = append(filterOption.Cmd, arg)
+				config.Port = append(config.Port, uint32(port))
+				continue
 			}
+
+			ip := net.ParseIP(arg)
+			if ip != nil {
+
+			}
+
+			config.Cmd = append(config.Cmd, arg)
 		}
 
-		topo = pkg.AnalyseSnapshot(snapshot, filterOption)
+		topo = pkg.AnalyseSnapshot(snapshot, config)
 		render, _ := pkg.NewDotRender(snapshot, topo)
-		render.Write(outputPath)
+		render.WriteTo(outputName)
 	},
 }
 
 var snapshotPath = ""
-var topoConfig = ""
-var outputPath = ""
+var configPath = ""
+var outputName = ""
 var connectionKind = ""
 
 func init() {
 	rootCmd.AddCommand(snapshotCmd)
+	rootCmd.AddCommand(reloadCmd)
 
 	flags := rootCmd.PersistentFlags()
 	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
-	flags.StringVarP(&topoConfig, "topo", "t", "", "local topo config file path")
-	flags.StringVarP(&outputPath, "output", "o", "output.dot", "output file path")
-	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
+	flags.StringVarP(&configPath, "config", "c", "", "local topo config file path")
+	flags.StringVarP(&outputName, "output", "o", "output.dot", "output file name")
+	flags.StringVarP(&connectionKind, "connection-kind", "k", "all", "connection kind")
 }
 
 func main() {
