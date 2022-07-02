@@ -5,22 +5,7 @@ import (
 	"strings"
 )
 
-type FilterOption struct {
-	All  bool
-	Cmd  []string `json:"cmd"`
-	Port []uint32 `json:"port"`
-	Pid  []int32  `json:"pid"`
-}
-
-func NewFilterOption() *FilterOption {
-	return &FilterOption{
-		Cmd:  []string{},
-		Port: []uint32{},
-		Pid:  []int32{},
-	}
-}
-
-func AnalyseSnapshot(snapshot *Snapshot, options *FilterOption) *PSTopo {
+func AnalyseSnapshot(snapshot *Snapshot, options *Config) *PSTopo {
 	topo := NewTopo(snapshot)
 
 	if options.All {

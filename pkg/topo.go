@@ -52,7 +52,7 @@ func (t *TopoEdge) String() string {
 	return strconv.Itoa(int(t.From)) + "->" + strconv.Itoa(int(t.To))
 }
 
-func (this *PSTopo) LinkProcess(pid, pid2 int32) {
+func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
 	if pid == 0 || pid2 == 0 {
 		return
 	}
@@ -61,20 +61,20 @@ func (this *PSTopo) LinkProcess(pid, pid2 int32) {
 	}
 
 	key := fmt.Sprintf("%d,%d", pid, pid2)
-	_, ok := this.HierarchyCaches[key]
+	_, ok := tp.HierarchyCaches[key]
 	if ok {
 		return
 	}
-	this.ProcessEdges = append(this.ProcessEdges,
+	tp.ProcessEdges = append(tp.ProcessEdges,
 		&TopoEdge{
 			From: pid,
 			To:   pid2,
 		},
 	)
-	this.HierarchyCaches[key] = true
+	tp.HierarchyCaches[key] = true
 }
 
-func (this *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
+func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	if pid == 0 || pid2 == 0 {
 		return
 	}
@@ -82,97 +82,97 @@ func (this *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) 
 		return
 	}
 	if !isPrivateIP(gonet.ParseIP(conn.Raddr.IP)) {
-		this.LinkPublicNetwork(pid, conn)
+		tp.LinkPublicNetwork(pid, conn)
 	} else {
-		_, ok := this.ConnectionCaches[conn.String()]
+		_, ok := tp.ConnectionCaches[conn.String()]
 		if ok {
 			return
 		}
-		this.NetworkEdges = append(this.NetworkEdges,
+		tp.NetworkEdges = append(tp.NetworkEdges,
 			&TopoEdge{
 				From:       pid,
 				To:         pid2,
 				Connection: conn,
 			},
 		)
-		this.ConnectionCaches[conn.String()] = true
+		tp.ConnectionCaches[conn.String()] = true
 	}
 }
 
-func (this *PSTopo) AddProcess(process *Process) {
+func (tp *PSTopo) AddProcess(process *Process) {
 	if process.Pid == 0 {
 		return
 	}
 
-	if _, ok := this.PidCaches[process.Pid]; ok {
+	if _, ok := tp.PidCaches[process.Pid]; ok {
 		return
 	}
-	this.Nodes = append(this.Nodes, process)
-	this.PidCaches[process.Pid] = true
+	tp.Nodes = append(tp.Nodes, process)
+	tp.PidCaches[process.Pid] = true
 }
 
-func (this *PSTopo) AddPid(pid int32) {
-	process, ok := this.Snapshot.PidProcess[pid]
+func (tp *PSTopo) AddPid(pid int32) {
+	process, ok := tp.Snapshot.PidProcess[pid]
 	if ok {
-		this.AddProcess(process)
+		tp.AddProcess(process)
 	}
 }
 
-func (this *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
+func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 
 	if pid == 0 {
 		return
 	}
-	_, ok := this.ConnectionCaches[conn.String()]
+	_, ok := tp.ConnectionCaches[conn.String()]
 	if ok {
 		return
 	}
-	this.PublicNetworkEdges = append(this.PublicNetworkEdges,
+	tp.PublicNetworkEdges = append(tp.PublicNetworkEdges,
 		&TopoEdge{
 			From:       pid,
 			Connection: conn,
 		},
 	)
-	this.ConnectionCaches[conn.String()] = true
+	tp.ConnectionCaches[conn.String()] = true
 
 }
 
-func (this *PSTopo) AddPidNeighbor(pid int32) {
-	snapshot := this.Snapshot
+func (tp *PSTopo) AddPidNeighbor(pid int32) {
+	snapshot := tp.Snapshot
 	process := snapshot.PidProcess[pid]
 	for _, child := range process.Children {
 		if childProcess, ok := snapshot.PidProcess[child]; ok {
-			this.LinkProcess(pid, child)
-			this.AddProcess(childProcess)
+			tp.LinkProcess(pid, child)
+			tp.AddProcess(childProcess)
 		}
 	}
 	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
-		this.LinkProcess(process.Parent, pid)
-		this.AddProcess(parentProcess)
+		tp.LinkProcess(process.Parent, pid)
+		tp.AddProcess(parentProcess)
 	}
 }
 
-func (this *PSTopo) AddProcessNeighbor(process *Process) {
-	snapshot := this.Snapshot
+func (tp *PSTopo) AddProcessNeighbor(process *Process) {
+	snapshot := tp.Snapshot
 	pid := process.Pid
 	for _, child := range process.Children {
 		if childProcess, ok := snapshot.PidProcess[child]; ok {
-			this.LinkProcess(pid, child)
-			this.AddProcess(childProcess)
+			tp.LinkProcess(pid, child)
+			tp.AddProcess(childProcess)
 		}
 	}
 	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
-		this.LinkProcess(process.Parent, pid)
-		this.AddProcess(parentProcess)
+		tp.LinkProcess(process.Parent, pid)
+		tp.AddProcess(parentProcess)
 	}
 }
 
-func (topo *PSTopo) processPort(ports map[uint32]bool) {
-	snapshot := topo.Snapshot
+func (tp *PSTopo) processPort(ports map[uint32]bool) {
+	snapshot := tp.Snapshot
 	listenPorts := []uint32{}
 	establishPorts := []uint32{}
 	for port, _ := range ports {
-		_, ok := topo.Snapshot.ListenPortPid[port]
+		_, ok := tp.Snapshot.ListenPortPid[port]
 		if ok {
 			listenPorts = append(listenPorts, port)
 		} else {
@@ -189,9 +189,9 @@ func (topo *PSTopo) processPort(ports map[uint32]bool) {
 			connPort := conn.Laddr.Port
 			connPid, ok := snapshot.PortPid[connPort]
 			if ok {
-				topo.AddPid(listenPid)
-				topo.AddPid(connPid)
-				topo.LinkNetwork(connPid, listenPid, conn)
+				tp.AddPid(listenPid)
+				tp.AddPid(connPid)
+				tp.LinkNetwork(connPid, listenPid, conn)
 			}
 
 		}
@@ -206,12 +206,12 @@ func (topo *PSTopo) processPort(ports map[uint32]bool) {
 				remoteIP, remotePort := conn.Raddr.IP, conn.Raddr.Port
 				if !isPrivateIP(gonet.ParseIP(remoteIP)) {
 					// remote is external ip
-					topo.LinkPublicNetwork(connPid, conn)
+					tp.LinkPublicNetwork(connPid, conn)
 				} else {
 					// remote is process
 					remotePid, ok := snapshot.PortPid[remotePort]
 					if ok {
-						topo.LinkNetwork(connPid, remotePid, conn)
+						tp.LinkNetwork(connPid, remotePid, conn)
 					}
 
 				}

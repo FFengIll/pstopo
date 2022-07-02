@@ -104,7 +104,7 @@ func NewDotRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
 	return &Render{g, graph, topo}, nil
 }
 
-func (this *Render) Write(output string) {
+func (this *Render) WriteTo(output string) {
 	t := template.New("dot")
 	for _, s := range []string{tmpLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
 		if _, err := t.Parse(s); err != nil {
