@@ -1,13 +1,16 @@
 package main
 
 import (
-	"github.com/FFengIll/pstopo/pkg"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net"
 	"strconv"
 	"strings"
+
+	jsoniter "github.com/json-iterator/go"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"github.com/FFengIll/pstopo/pkg"
 )
 
 var reloadCmd = &cobra.Command{
@@ -23,8 +26,6 @@ var reloadCmd = &cobra.Command{
 		snapshotPath = reloadName + ".snapshot.json"
 		configPath = reloadName + ".topo.json"
 		outputName = reloadName
-
-		config := pkg.NewConfig()
 
 		var snapshot *pkg.Snapshot
 		data, _ := ioutil.ReadFile(snapshotPath)
@@ -62,9 +63,11 @@ var reloadCmd = &cobra.Command{
 			config.Cmd = append(config.Cmd, arg)
 		}
 
+		var topo *pkg.PSTopo
 		topo = pkg.AnalyseSnapshot(snapshot, config)
-		render, _ := pkg.NewDotRender(snapshot, topo)
-		render.WriteTo(outputName)
+		render, _ := pkg.NewDotRender()
+		dotData, _ := render.RenderToData(snapshot, topo)
+		render.WriteTo(dotData, outputName)
 	},
 }
 

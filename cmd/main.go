@@ -3,17 +3,17 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net"
-
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
+	"net"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/FFengIll/pstopo/pkg"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/FFengIll/pstopo/pkg"
 )
 
 func existFile(path string) bool {
@@ -86,8 +86,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		topo = pkg.AnalyseSnapshot(snapshot, config)
-		render, _ := pkg.NewDotRender(snapshot, topo)
-		render.WriteTo(outputName)
+		render, _ := pkg.NewDotRender()
+		dotData, _ := render.RenderToData(snapshot, topo)
+		render.WriteTo(dotData, outputName)
 	},
 }
 

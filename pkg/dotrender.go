@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/goccy/go-graphviz"
-	"github.com/goccy/go-graphviz/cgraph"
 	"os"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/goccy/go-graphviz"
+	"github.com/goccy/go-graphviz/cgraph"
+	"github.com/sirupsen/logrus"
 )
 
 type Render struct {
-	g     *graphviz.Graphviz
-	graph *cgraph.Graph
-	topo  *PSTopo
+	engine *graphviz.Graphviz
+	graph  *cgraph.Graph
 }
 
 type dotNode struct {
@@ -76,10 +77,59 @@ func (p dotAttrs) Lines() string {
 	return fmt.Sprintf("%s;", strings.Join(p.List(), ";\n"))
 }
 
-func NewDotRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
+func NewDotRender() (*Render, error) {
 	g := graphviz.New()
 	graph, _ := g.Graph()
 
+	return &Render{g, graph}, nil
+}
+
+func (r *Render) WriteTo(data *dotGraphData, output string) {
+	t := template.New("dot")
+	for _, s := range []string{tmpLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
+		if _, err := t.Parse(s); err != nil {
+			panic(err)
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(buf.String())
+	graph, err := graphviz.ParseBytes(buf.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	// FIXME: use parsed graph, not r.graph
+	if !strings.HasSuffix(output, ".dot") {
+		output = output + ".dot"
+	}
+	if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
+		//fd, _ := os.Open(output)
+		//fd.WriteString(err.Error())
+		logrus.Errorln(err)
+		logrus.Errorln("parse graph error, but try to output the file")
+		return
+	}
+}
+
+func contains(lst []uint32, item uint32) bool {
+	for _, dst := range lst {
+		if item == dst {
+			return true
+		}
+	}
+	return false
+}
+
+func makeDotPortLabel(label string, dotPort string) string {
+	return fmt.Sprintf("<p%s> %s", dotPort, label)
+}
+
+func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error) {
+	graph := r.graph
 	caches := map[int32]*cgraph.Node{}
 	for _, node := range topo.Nodes {
 		process := snapshot.PidProcess[node.Pid]
@@ -100,55 +150,6 @@ func NewDotRender(snapshot *Snapshot, topo *PSTopo) (*Render, error) {
 		}
 		e.SetColor("red")
 	}
-
-	return &Render{g, graph, topo}, nil
-}
-
-func (this *Render) WriteTo(output string) {
-	t := template.New("dot")
-	for _, s := range []string{tmpLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
-		if _, err := t.Parse(s); err != nil {
-			panic(err)
-		}
-	}
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, this.Data()); err != nil {
-		panic(err)
-	}
-
-	fmt.Println(buf.String())
-	graph, err := graphviz.ParseBytes(buf.Bytes())
-	if err != nil {
-		panic(err)
-	}
-	// FIXME: use parsed graph, not this.graph
-	if !strings.HasSuffix(output, ".dot") {
-		output = output + ".dot"
-	}
-	if err := this.g.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
-		panic(err)
-	}
-	if err := this.g.RenderFilename(graph, graphviz.Format(graphviz.PNG), output+".png"); err != nil {
-		panic(err)
-	}
-}
-
-func contains(lst []uint32, item uint32) bool {
-	for _, dst := range lst {
-		if item == dst {
-			return true
-		}
-	}
-	return false
-}
-
-func makeDotPortLabel(label string, dotPort string) string {
-	return fmt.Sprintf("<p%s> %s", dotPort, label)
-}
-
-func (this *Render) Data() *dotGraphData {
-	topo := this.topo
-	snapshot := this.topo.Snapshot
 
 	relatedPidPorts := map[int32][]uint32{}
 	pushPidPort := func(pid int32, port uint32) {
@@ -248,7 +249,7 @@ func (this *Render) Data() *dotGraphData {
 		Title: fmt.Sprintf("%s (%s)", "PSTopo", now.Format(time.RFC3339)),
 		Nodes: nodes,
 		Edges: edges,
-	}
+	}, nil
 }
 
 func toDotPort(port uint32) string {
