@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/FFengIll/pstopo/pkg"
 	"github.com/spf13/cobra"
+
+	"github.com/FFengIll/pstopo/pkg"
 )
 
 var snapshotCmd = &cobra.Command{

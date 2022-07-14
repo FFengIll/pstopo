@@ -1,15 +1,18 @@
 package pkg
 
 import (
-	_ "gopkg.in/yaml.v3"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+	_ "gopkg.in/yaml.v3"
 )
 
 func AnalyseSnapshot(snapshot *Snapshot, options *Config) *PSTopo {
 	topo := NewTopo(snapshot)
 
 	if options.All {
-		TopoAll(snapshot, topo)
+		logrus.Warningf("will generate with all data, it maybe hard")
+		GenerateAll(snapshot, topo)
 	} else {
 		pids := map[int32]bool{}
 		ports := map[uint32]bool{}
@@ -41,7 +44,7 @@ func AnalyseSnapshot(snapshot *Snapshot, options *Config) *PSTopo {
 			topo.AddPid(pid)
 			topo.AddPidNeighbor(pid)
 
-			// add their ports
+			// add all ports for the pid
 			for _, port := range snapshot.PidListenPort[pid] {
 				ports[port] = true
 			}
@@ -57,7 +60,7 @@ func AnalyseSnapshot(snapshot *Snapshot, options *Config) *PSTopo {
 	return topo
 }
 
-func TopoAll(snapshot *Snapshot, topo *PSTopo) {
+func GenerateAll(snapshot *Snapshot, topo *PSTopo) {
 	for pid, process := range snapshot.PidProcess {
 		topo.AddProcess(process)
 		topo.AddPidNeighbor(pid)

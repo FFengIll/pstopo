@@ -2,10 +2,11 @@ package pkg
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/v3/net"
-	"gonum.org/v1/gonum/graph"
 	gonet "net"
 	"strconv"
+
+	"github.com/shirou/gopsutil/v3/net"
+	"gonum.org/v1/gonum/graph"
 )
 
 type PairID struct {
@@ -192,6 +193,8 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 				tp.AddPid(listenPid)
 				tp.AddPid(connPid)
 				tp.LinkNetwork(connPid, listenPid, conn)
+
+				// FIXME: to avoid any potential error, force add the port to pid
 			}
 
 		}

@@ -1,8 +1,9 @@
 package pkg
 
 import (
-	jsoniter "github.com/json-iterator/go"
 	"io/ioutil"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Config struct {

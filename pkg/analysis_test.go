@@ -1,9 +1,10 @@
 package pkg
 
 import (
-	jsoniter "github.com/json-iterator/go"
 	"io/ioutil"
 	"testing"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 func generateSnapshot() *Snapshot {
@@ -20,7 +21,7 @@ func generateSnapshot() *Snapshot {
 
 func TestAnalyseSnapshot(t *testing.T) {
 	snapshot := generateSnapshot()
-	filterOption := &FilterOption{
+	filterOption := &Config{
 		Cmd: []string{"Elec"},
 	}
 	topo := AnalyseSnapshot(snapshot, filterOption)
