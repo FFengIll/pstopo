@@ -33,11 +33,15 @@ var reloadCmd = &cobra.Command{
 			panic(err)
 		}
 
-		var topo *pkg.PSTopo
-		data, _ = ioutil.ReadFile(configPath)
-		err = json.Unmarshal(data, &config)
-		if err != nil {
-			panic(err)
+		config := pkg.NewConfig()
+		if existFile(configPath) {
+			data, _ = ioutil.ReadFile(configPath)
+			err = json.Unmarshal(data, &config)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			logrus.Warningln("no such config, use empty")
 		}
 
 		// add filter options from cli
