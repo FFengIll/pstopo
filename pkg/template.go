@@ -1,6 +1,6 @@
 package pkg
 
-const tmpLegend = `{{define "legend" -}}
+const tmplLegend = `{{define "legend" -}}
  subgraph cluster_legend { 
     label = "Legend";
 	graph [shape=box, fontsize=25]

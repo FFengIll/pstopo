@@ -21,9 +21,9 @@ type PSTopo struct {
 	ProcessEdges       []*TopoEdge
 	NetworkEdges       []*TopoEdge
 	PublicNetworkEdges []*TopoEdge
-	PidCaches          map[int32]bool
-	ConnectionCaches   map[string]bool
-	HierarchyCaches    map[string]bool
+	PidSet             map[int32]bool
+	ConnectionSet      map[string]bool
+	PidChildSet        map[string]bool
 }
 
 type TopoNode Process
@@ -43,9 +43,9 @@ func NewTopo(snapshot *Snapshot) *PSTopo {
 		PublicNetworkEdges: []*TopoEdge{},
 		ProcessEdges:       []*TopoEdge{},
 
-		PidCaches:        map[int32]bool{},
-		ConnectionCaches: map[string]bool{},
-		HierarchyCaches:  map[string]bool{},
+		PidSet:        map[int32]bool{},
+		ConnectionSet: map[string]bool{},
+		PidChildSet:   map[string]bool{},
 	}
 }
 
@@ -62,7 +62,7 @@ func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
 	}
 
 	key := fmt.Sprintf("%d,%d", pid, pid2)
-	_, ok := tp.HierarchyCaches[key]
+	_, ok := tp.PidChildSet[key]
 	if ok {
 		return
 	}
@@ -72,7 +72,7 @@ func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
 			To:   pid2,
 		},
 	)
-	tp.HierarchyCaches[key] = true
+	tp.PidChildSet[key] = true
 }
 
 func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
@@ -85,7 +85,7 @@ func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	if !isPrivateIP(gonet.ParseIP(conn.Raddr.IP)) {
 		tp.LinkPublicNetwork(pid, conn)
 	} else {
-		_, ok := tp.ConnectionCaches[conn.String()]
+		_, ok := tp.ConnectionSet[conn.String()]
 		if ok {
 			return
 		}
@@ -96,7 +96,7 @@ func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 				Connection: conn,
 			},
 		)
-		tp.ConnectionCaches[conn.String()] = true
+		tp.ConnectionSet[conn.String()] = true
 	}
 }
 
@@ -105,11 +105,11 @@ func (tp *PSTopo) AddProcess(process *Process) {
 		return
 	}
 
-	if _, ok := tp.PidCaches[process.Pid]; ok {
+	if _, ok := tp.PidSet[process.Pid]; ok {
 		return
 	}
 	tp.Nodes = append(tp.Nodes, process)
-	tp.PidCaches[process.Pid] = true
+	tp.PidSet[process.Pid] = true
 }
 
 func (tp *PSTopo) AddPid(pid int32) {
@@ -124,7 +124,7 @@ func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	if pid == 0 {
 		return
 	}
-	_, ok := tp.ConnectionCaches[conn.String()]
+	_, ok := tp.ConnectionSet[conn.String()]
 	if ok {
 		return
 	}
@@ -134,7 +134,7 @@ func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 			Connection: conn,
 		},
 	)
-	tp.ConnectionCaches[conn.String()] = true
+	tp.ConnectionSet[conn.String()] = true
 
 }
 
@@ -170,9 +170,9 @@ func (tp *PSTopo) AddProcessNeighbor(process *Process) {
 
 func (tp *PSTopo) processPort(ports map[uint32]bool) {
 	snapshot := tp.Snapshot
-	listenPorts := []uint32{}
-	establishPorts := []uint32{}
-	for port, _ := range ports {
+	var listenPorts []uint32
+	var establishPorts []uint32
+	for port := range ports {
 		_, ok := tp.Snapshot.ListenPortPid[port]
 		if ok {
 			listenPorts = append(listenPorts, port)
@@ -221,12 +221,4 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 			}
 		}
 	}
-}
-
-func AddNode() {
-
-}
-
-func LinkNode() {
-
 }

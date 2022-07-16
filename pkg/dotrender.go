@@ -29,7 +29,6 @@ type dotNode struct {
 type dotEdge struct {
 	From  string
 	To    string
-	Edge  string
 	Label string
 	Attrs dotAttrs
 }
@@ -37,12 +36,12 @@ type dotEdge struct {
 func newDotEdge() *dotEdge {
 	return &dotEdge{
 		Label: "",
-		Edge:  "->",
 		Attrs: dotAttrs{},
 	}
 }
+
 func (e dotEdge) String() string {
-	return fmt.Sprintf("%s %s %s [ label=\"%s\", %s ]", e.From, e.Edge, e.To, e.Label, e.Attrs)
+	return fmt.Sprintf("%s -> %s [ label=\"%s\", %s ]", e.From, e.To, e.Label, e.Attrs)
 }
 
 func (n dotNode) String() string {
@@ -50,8 +49,7 @@ func (n dotNode) String() string {
 }
 
 type dotGraphData struct {
-	Title  string
-	Minlen uint
+	Title string
 	//Attrs   dotAttrs
 	//Cluster *dotCluster
 	Nodes   []*dotNode
@@ -86,7 +84,7 @@ func NewDotRender() (*Render, error) {
 
 func (r *Render) WriteTo(data *dotGraphData, output string) {
 	t := template.New("dot")
-	for _, s := range []string{tmpLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
+	for _, s := range []string{tmplLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
 		if _, err := t.Parse(s); err != nil {
 			panic(err)
 		}
@@ -115,32 +113,23 @@ func (r *Render) WriteTo(data *dotGraphData, output string) {
 	}
 }
 
-func contains(lst []uint32, item uint32) bool {
-	for _, dst := range lst {
-		if item == dst {
-			return true
-		}
-	}
-	return false
-}
-
 func makeDotPortLabel(label string, dotPort string) string {
 	return fmt.Sprintf("<p%s> %s", dotPort, label)
 }
 
 func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error) {
 	graph := r.graph
-	caches := map[int32]*cgraph.Node{}
+	index := map[int32]*cgraph.Node{}
 	for _, node := range topo.Nodes {
 		process := snapshot.PidProcess[node.Pid]
 		name := "n" + strconv.Itoa(int(process.Pid))
 		n, _ := graph.CreateNode(name)
-		caches[node.Pid] = n
+		index[node.Pid] = n
 	}
 
 	for _, edge := range topo.NetworkEdges {
-		fromNode := caches[edge.From]
-		toNode := caches[edge.To]
+		fromNode := index[edge.From]
+		toNode := index[edge.To]
 		if fromNode == nil || toNode == nil {
 			continue
 		}
