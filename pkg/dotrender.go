@@ -242,6 +242,10 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 }
 
 func toDotPort(port uint32) string {
+	// for port == 0, we process it as `no dot node port`
+	if port == 0 {
+		return ""
+	}
 	return ":" + "p" + strconv.Itoa(int(port))
 }
 
