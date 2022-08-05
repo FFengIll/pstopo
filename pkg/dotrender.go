@@ -117,17 +117,17 @@ func makeDotPortLabel(label string, dotPort string) string {
 	return fmt.Sprintf("<p%s> %s", dotPort, label)
 }
 
-func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error) {
+func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error) {
 	graph := r.graph
 	index := map[int32]*cgraph.Node{}
-	for _, node := range topo.Nodes {
+	for _, node := range topo.PidSet {
 		process := snapshot.PidProcess[node.Pid]
 		name := "n" + strconv.Itoa(int(process.Pid))
 		n, _ := graph.CreateNode(name)
 		index[node.Pid] = n
 	}
 
-	for _, edge := range topo.NetworkEdges {
+	for _, edge := range topo.ConnectionSet {
 		fromNode := index[edge.From]
 		toNode := index[edge.To]
 		if fromNode == nil || toNode == nil {
@@ -145,19 +145,36 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		ports := relatedPidPorts[pid]
 		relatedPidPorts[pid] = append(ports, port)
 	}
-	for _, e := range topo.PublicNetworkEdges {
+	for _, e := range topo.PublicConnectionSet {
 		pushPidPort(e.Connection.Pid, e.Connection.Laddr.Port)
 		remotePid := snapshot.PortPid[e.Connection.Raddr.Port]
 		pushPidPort(remotePid, e.Connection.Raddr.Port)
 	}
-	for _, e := range topo.NetworkEdges {
+	for _, e := range topo.ConnectionSet {
 		pushPidPort(e.Connection.Pid, e.Connection.Laddr.Port)
 		remotePid := snapshot.PortPid[e.Connection.Raddr.Port]
 		pushPidPort(remotePid, e.Connection.Raddr.Port)
 	}
 
+	//// confirm to include all used ports
+	//for _, e := range topo.NetworkEdges {
+	//	data := topo.Snapshot.PidPort[e.From]
+	//	data = append(data, e.Connection.Laddr.Port)
+	//	topo.Snapshot.PidPort[e.From] = data
+	//
+	//	data = topo.Snapshot.PidPort[e.To]
+	//	data = append(data, e.Connection.Raddr.Port)
+	//	topo.Snapshot.PidPort[e.To] = data
+	//}
+	//for _, e := range topo.PublicNetworkEdges {
+	//	data := topo.Snapshot.PidPort[e.From]
+	//	data = append(data, e.Connection.Laddr.Port)
+	//	topo.Snapshot.PidPort[e.From] = data
+	//}
+
+	// create node
 	var nodes []*dotNode
-	for _, n := range topo.Nodes {
+	for _, n := range topo.PidSet {
 		if n.Pid == 0 {
 			continue
 		}
@@ -172,17 +189,27 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		parts := map[int]string{}
 
 		// TODO: may only include related port (but it may not good)
-		//related := relatedPidPorts[n.Pid]
-		for _, port := range topo.Snapshot.PidPort[n.Pid] {
-			//if contains(related, port) {
-			parts[int(port)] = ":" + strconv.Itoa(int(port))
-			//}
+		{
+			set, ok := topo.Snapshot.PidPort[n.Pid]
+			if ok {
+				for port := range set.Iter() {
+					//if contains(related, port) {
+					parts[int(port)] = ":" + strconv.Itoa(int(port))
+					//}
+				}
+			}
 		}
+
 		// put listen bellow to avoid overwrite
-		for _, port := range topo.Snapshot.PidListenPort[n.Pid] {
-			//if contains(related, port) {
-			parts[int(port)] = "Listen " + ":" + strconv.Itoa(int(port))
-			//}
+		{
+			set, ok := topo.Snapshot.PidListenPort[n.Pid]
+			if ok {
+				for port := range set.Iter() {
+					//if contains(related, port) {
+					parts[int(port)] = "Listen " + ":" + strconv.Itoa(int(port))
+					//}
+				}
+			}
 		}
 
 		paths := strings.Split(n.Exec, string(os.PathSeparator))
@@ -193,9 +220,20 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		nodes = append(nodes, node)
 	}
 
-	var edges []*dotEdge
+	//var exists = map[string]bool{}
+	//for _, n := range nodes {
+	//	exists[n.ID] = true
+	//}
 
-	for _, e := range topo.ProcessEdges {
+	// generate edge data at first
+	var edges []*dotEdge
+	for _, e := range topo.PidChildSet {
+		//if ok := exists[toDotId(e.From)]; !ok {
+		//	continue
+		//}
+		//if ok := exists[toDotId(e.To)]; !ok {
+		//	continue
+		//}
 		edge := newDotEdge()
 		edge.From = toDotId(e.From) + toDotPort(0)
 		edge.To = toDotId(e.To) + toDotPort(0)
@@ -203,7 +241,13 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		edge.Attrs["color"] = "red"
 		edges = append(edges, edge)
 	}
-	for _, e := range topo.NetworkEdges {
+	for _, e := range topo.ConnectionSet {
+		//if ok := exists[toDotId(e.From)]; !ok {
+		//	continue
+		//}
+		//if ok := exists[toDotId(e.To)]; !ok {
+		//	continue
+		//}
 		edge := newDotEdge()
 		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = toDotId(e.To) + toDotPort(e.Connection.Raddr.Port)
@@ -211,8 +255,14 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		edge.Attrs["color"] = "green"
 		edge.Attrs["dir"] = "both"
 		edges = append(edges, edge)
+
+		//topo.Snapshot.PidPort[e.To] = append(topo.Snapshot.PidPort[e.To], e.Connection.Raddr.Port)
 	}
-	for _, e := range topo.PublicNetworkEdges {
+	for _, e := range topo.PublicConnectionSet {
+
+		//if ok := exists[toDotId(e.To)]; !ok {
+		//	continue
+		//}
 		ip := e.Connection.Raddr.IP
 		id := "ip" + replaceIPChar(ip)
 		node := &dotNode{
@@ -231,6 +281,8 @@ func (r *Render) RenderToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, 
 		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = id
 		edges = append(edges, edge)
+
+		//topo.Snapshot.PidPort[e.From] = append(topo.Snapshot.PidPort[e.From], e.Connection.Laddr.Port)
 	}
 
 	now := time.Now()

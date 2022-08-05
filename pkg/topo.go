@@ -16,14 +16,11 @@ type PairID struct {
 
 type PSTopo struct {
 	graph.Graph
-	Snapshot           *Snapshot
-	Nodes              []*Process
-	ProcessEdges       []*TopoEdge
-	NetworkEdges       []*TopoEdge
-	PublicNetworkEdges []*TopoEdge
-	PidSet             map[int32]bool
-	ConnectionSet      map[string]bool
-	PidChildSet        map[string]bool
+	Snapshot            *Snapshot
+	PidSet              map[int32]*Process
+	ConnectionSet       map[string]*TopoEdge
+	PublicConnectionSet map[string]*TopoEdge
+	PidChildSet         map[string]*TopoEdge
 }
 
 type TopoNode Process
@@ -36,16 +33,11 @@ type TopoEdge struct {
 
 func NewTopo(snapshot *Snapshot) *PSTopo {
 	return &PSTopo{
-		Snapshot: snapshot,
-
-		Nodes:              []*Process{},
-		NetworkEdges:       []*TopoEdge{},
-		PublicNetworkEdges: []*TopoEdge{},
-		ProcessEdges:       []*TopoEdge{},
-
-		PidSet:        map[int32]bool{},
-		ConnectionSet: map[string]bool{},
-		PidChildSet:   map[string]bool{},
+		Snapshot:            snapshot,
+		PidSet:              map[int32]*Process{},
+		ConnectionSet:       map[string]*TopoEdge{},
+		PublicConnectionSet: map[string]*TopoEdge{},
+		PidChildSet:         map[string]*TopoEdge{},
 	}
 }
 
@@ -66,13 +58,10 @@ func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
 	if ok {
 		return
 	}
-	tp.ProcessEdges = append(tp.ProcessEdges,
-		&TopoEdge{
-			From: pid,
-			To:   pid2,
-		},
-	)
-	tp.PidChildSet[key] = true
+	tp.PidChildSet[key] = &TopoEdge{
+		From: pid,
+		To:   pid2,
+	}
 }
 
 func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
@@ -89,14 +78,11 @@ func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 		if ok {
 			return
 		}
-		tp.NetworkEdges = append(tp.NetworkEdges,
-			&TopoEdge{
-				From:       pid,
-				To:         pid2,
-				Connection: conn,
-			},
-		)
-		tp.ConnectionSet[conn.String()] = true
+		tp.ConnectionSet[conn.String()] = &TopoEdge{
+			From:       pid,
+			To:         pid2,
+			Connection: conn,
+		}
 	}
 }
 
@@ -108,8 +94,7 @@ func (tp *PSTopo) AddProcess(process *Process) {
 	if _, ok := tp.PidSet[process.Pid]; ok {
 		return
 	}
-	tp.Nodes = append(tp.Nodes, process)
-	tp.PidSet[process.Pid] = true
+	tp.PidSet[process.Pid] = process
 }
 
 func (tp *PSTopo) AddPid(pid int32) {
@@ -124,17 +109,14 @@ func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	if pid == 0 {
 		return
 	}
-	_, ok := tp.ConnectionSet[conn.String()]
+	_, ok := tp.PublicConnectionSet[conn.String()]
 	if ok {
 		return
 	}
-	tp.PublicNetworkEdges = append(tp.PublicNetworkEdges,
-		&TopoEdge{
-			From:       pid,
-			Connection: conn,
-		},
-	)
-	tp.ConnectionSet[conn.String()] = true
+	tp.PublicConnectionSet[conn.String()] = &TopoEdge{
+		From:       pid,
+		Connection: conn,
+	}
 
 }
 

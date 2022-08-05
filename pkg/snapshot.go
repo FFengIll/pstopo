@@ -5,31 +5,83 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"time"
 
+	sets "github.com/deckarep/golang-set"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/sirupsen/logrus"
 )
 
-type Snapshot struct {
-	PidProcess    map[int32]*Process `yaml:"process"`
-	PidListenPort map[int32][]uint32 `yaml:"pid_listen_port"`
-	PidPort       map[int32][]uint32 `yaml:"pid_port"`
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
+type PortSet struct {
+	internal sets.Set
+	sync.Once
+}
+
+func NewPortSet() *PortSet {
+	return &PortSet{
+		internal: sets.NewSet(),
+	}
+}
+
+func (set *PortSet) Iter() <-chan uint32 {
+	ch := make(chan uint32)
+	go func() {
+		for elem := range set.internal.Iter() {
+			ch <- elem.(uint32)
+		}
+		close(ch)
+	}()
+
+	return ch
+}
+
+func (set *PortSet) Add(port uint32) bool {
+	return set.internal.Add(port)
+}
+
+func (set *PortSet) MarshalJSON() ([]byte, error) {
+	var array []uint32
+	for item := range set.Iter() {
+		array = append(array, item)
+	}
+	return json.Marshal(array)
+}
+
+func (set *PortSet) UnmarshalJSON(data []byte) error {
+	var array []uint32
+	err := json.Unmarshal(data, &array)
+	if err != nil {
+		return err
+	}
+	if set.internal == nil {
+		set.internal = sets.NewSet()
+	}
+	for _, item := range array {
+		set.internal.Add(item)
+	}
+	return nil
+}
+
+type Snapshot struct {
+	PidProcess            map[int32]*Process              `yaml:"process"`
+	PidListenPort         map[int32]*PortSet              `yaml:"pid_listen_port"`
+	PidPort               map[int32]*PortSet              `yaml:"pid_port"`
 	ListenPortConnections map[uint32][]net.ConnectionStat `yaml:"listen_port_connection"`
 	ListenPortPid         map[uint32]int32                `yaml:"listen_port_pid"`
-
-	PortConnection map[uint32]net.ConnectionStat `yaml:"port_connection"`
-	PortPid        map[uint32]int32              `yaml:"port_pid"`
+	PortConnection        map[uint32]net.ConnectionStat   `yaml:"port_connection"`
+	PortPid               map[uint32]int32                `yaml:"port_pid"`
 }
 
 func NewSnapshot() *Snapshot {
 	s := Snapshot{
 		PidProcess:    map[int32]*Process{},
-		PidListenPort: map[int32][]uint32{},
-		PidPort:       map[int32][]uint32{},
+		PidListenPort: map[int32]*PortSet{},
+		PidPort:       map[int32]*PortSet{},
 
 		ListenPortConnections: map[uint32][]net.ConnectionStat{},
 		ListenPortPid:         map[uint32]int32{},
@@ -54,6 +106,8 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 		exec, _ := p.Exe()
 		cmdline, _ := p.Cmdline()
 		children, _ := p.Children()
+		snapshot.PidListenPort[pid] = NewPortSet()
+		snapshot.PidPort[pid] = NewPortSet()
 		snapshot.PidProcess[pid] = &Process{
 			Pid:     p.Pid,
 			Exec:    exec,
@@ -91,8 +145,8 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 			conns := snapshot.ListenPortConnections[listenPort]
 			snapshot.ListenPortConnections[listenPort] = append(conns, conn)
 
-			listen := snapshot.PidListenPort[conn.Pid]
-			snapshot.PidListenPort[conn.Pid] = append(listen, listenPort)
+			set := snapshot.PidListenPort[conn.Pid]
+			set.Add(listenPort)
 
 		} else {
 			localPort := conn.Laddr.Port
@@ -101,9 +155,11 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 
 			snapshot.PortConnection[localPort] = conn
 
-			establish := snapshot.PidPort[conn.Pid]
-			snapshot.PidPort[conn.Pid] = append(establish, localPort)
-
+			set, ok := snapshot.PidPort[conn.Pid]
+			if !ok {
+				logrus.WithField("pid", conn.Pid).Warningln("no such pid")
+			}
+			set.Add(localPort)
 		}
 	}
 

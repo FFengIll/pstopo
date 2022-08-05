@@ -27,9 +27,9 @@ var reloadCmd = &cobra.Command{
 		configPath = reloadName + ".topo.json"
 		outputName = reloadName
 
-		var snapshot *pkg.Snapshot
+		snapshot := &pkg.Snapshot{}
 		data, _ := ioutil.ReadFile(snapshotPath)
-		err := json.Unmarshal(data, &snapshot)
+		err := json.Unmarshal(data, snapshot)
 		if err != nil {
 			panic(err)
 		}
@@ -66,7 +66,7 @@ var reloadCmd = &cobra.Command{
 		var topo *pkg.PSTopo
 		topo = pkg.AnalyseSnapshot(snapshot, config)
 		render, _ := pkg.NewDotRender()
-		dotData, _ := render.RenderToData(snapshot, topo)
+		dotData, _ := render.ToData(snapshot, topo)
 		render.WriteTo(dotData, outputName)
 	},
 }
