@@ -71,18 +71,14 @@ func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	if pid == pid2 {
 		return
 	}
-	if !isPrivateIP(gonet.ParseIP(conn.Raddr.IP)) {
-		tp.LinkPublicNetwork(pid, conn)
-	} else {
-		_, ok := tp.ConnectionSet[conn.String()]
-		if ok {
-			return
-		}
-		tp.ConnectionSet[conn.String()] = &TopoEdge{
-			From:       pid,
-			To:         pid2,
-			Connection: conn,
-		}
+	_, ok := tp.ConnectionSet[conn.String()]
+	if ok {
+		return
+	}
+	tp.ConnectionSet[conn.String()] = &TopoEdge{
+		From:       pid,
+		To:         pid2,
+		Connection: conn,
 	}
 }
 
