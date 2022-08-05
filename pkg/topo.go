@@ -182,23 +182,25 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 		}
 	}
 
-	for _, connPort := range establishPorts {
+	for _, localPort := range establishPorts {
 		// establish Port
-		connPid, ok := snapshot.PortPid[connPort]
+		connPid, ok := snapshot.PortPid[localPort]
 		if ok {
-			conn := snapshot.GetConnections(connPort)
-			if conn.Laddr.Port == connPort { //redundant
+			conn := snapshot.GetConnection(localPort)
+			if conn.Laddr.Port == localPort { //redundant
 				remoteIP, remotePort := conn.Raddr.IP, conn.Raddr.Port
-				if !isPrivateIP(gonet.ParseIP(remoteIP)) {
-					// remote is external ip
-					tp.LinkPublicNetwork(connPid, conn)
-				} else {
+				if isPrivateIP(gonet.ParseIP(remoteIP)) {
 					// remote is process
 					remotePid, ok := snapshot.PortPid[remotePort]
 					if ok {
+						tp.AddPid(connPid)
+						tp.AddPid(remotePid)
 						tp.LinkNetwork(connPid, remotePid, conn)
 					}
-
+				} else {
+					// remote is external ip
+					tp.AddPid(conn.Pid)
+					tp.LinkPublicNetwork(connPid, conn)
 				}
 			}
 		}
