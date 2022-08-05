@@ -68,6 +68,9 @@ var reloadCmd = &cobra.Command{
 		render, _ := pkg.NewDotRender()
 		dotData, _ := render.ToData(snapshot, topo)
 		render.WriteTo(dotData, outputName)
+		if update {
+			snapshot.DumpFile(snapshotPath)
+		}
 	},
 }
 
