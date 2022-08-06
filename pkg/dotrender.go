@@ -206,7 +206,7 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = toDotId(e.To) + toDotPort(e.Connection.Raddr.Port)
 		edge.Attrs["label"] = ""
-		edge.Attrs["color"] = "green"
+		edge.Attrs["color"] = "darkgreen"
 		edge.Attrs["dir"] = "both"
 		edges = append(edges, edge)
 	}
