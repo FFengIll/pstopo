@@ -21,9 +21,10 @@ func generateSnapshot() *Snapshot {
 
 func TestAnalyseSnapshot(t *testing.T) {
 	snapshot := generateSnapshot()
-	filterOption := &Config{
+	cfg := &Config{
 		Cmd: []string{"Elec"},
 	}
-	topo := AnalyseSnapshot(snapshot, filterOption)
+	topo := NewTopo(snapshot)
+	topo = topo.Analyse(cfg)
 	println(topo)
 }
