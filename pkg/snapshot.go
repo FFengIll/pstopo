@@ -5,67 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	"sync"
 	"time"
 
-	sets "github.com/deckarep/golang-set"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/sirupsen/logrus"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
-
-type PortSet struct {
-	internal sets.Set
-	sync.Once
-}
-
-func NewPortSet() *PortSet {
-	return &PortSet{
-		internal: sets.NewSet(),
-	}
-}
-
-func (set *PortSet) Iter() <-chan uint32 {
-	ch := make(chan uint32)
-	go func() {
-		for elem := range set.internal.Iter() {
-			ch <- elem.(uint32)
-		}
-		close(ch)
-	}()
-
-	return ch
-}
-
-func (set *PortSet) Add(port uint32) bool {
-	return set.internal.Add(port)
-}
-
-func (set *PortSet) MarshalJSON() ([]byte, error) {
-	var array []uint32
-	for item := range set.Iter() {
-		array = append(array, item)
-	}
-	return json.Marshal(array)
-}
-
-func (set *PortSet) UnmarshalJSON(data []byte) error {
-	var array []uint32
-	err := json.Unmarshal(data, &array)
-	if err != nil {
-		return err
-	}
-	if set.internal == nil {
-		set.internal = sets.NewSet()
-	}
-	for _, item := range array {
-		set.internal.Add(item)
-	}
-	return nil
-}
 
 type Snapshot struct {
 	PidProcess            map[int32]*Process              `yaml:"process"`
@@ -168,7 +114,7 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 
 func (s *Snapshot) Processes() []*Process {
 	return func() []*Process {
-		ps := []*Process{}
+		var ps []*Process
 		for _, p := range s.PidProcess {
 			ps = append(ps, p)
 		}
@@ -215,11 +161,10 @@ func (s *Snapshot) Copy(snapshot *Snapshot, pid int32) {
 }
 
 func (s *Snapshot) CopyLite(snapshot *Snapshot, pid int32) {
-
 	s.PidProcess[pid] = snapshot.PidProcess[pid]
 	s.PidListenPort[pid] = snapshot.PidListenPort[pid]
 }
 
-func (s *Snapshot) GetConnections(port uint32) net.ConnectionStat {
+func (s *Snapshot) GetConnection(port uint32) net.ConnectionStat {
 	return s.PortConnection[port]
 }

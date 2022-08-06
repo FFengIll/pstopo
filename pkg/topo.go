@@ -101,39 +101,21 @@ func (tp *PSTopo) AddPid(pid int32) {
 }
 
 func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
-
 	if pid == 0 {
 		return
 	}
-	_, ok := tp.PublicConnectionSet[conn.String()]
-	if ok {
+	if _, ok := tp.PublicConnectionSet[conn.String()]; ok {
 		return
 	}
 	tp.PublicConnectionSet[conn.String()] = &TopoEdge{
 		From:       pid,
 		Connection: conn,
 	}
-
 }
 
 func (tp *PSTopo) AddPidNeighbor(pid int32) {
 	snapshot := tp.Snapshot
 	process := snapshot.PidProcess[pid]
-	for _, child := range process.Children {
-		if childProcess, ok := snapshot.PidProcess[child]; ok {
-			tp.LinkProcess(pid, child)
-			tp.AddProcess(childProcess)
-		}
-	}
-	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
-		tp.LinkProcess(process.Parent, pid)
-		tp.AddProcess(parentProcess)
-	}
-}
-
-func (tp *PSTopo) AddProcessNeighbor(process *Process) {
-	snapshot := tp.Snapshot
-	pid := process.Pid
 	for _, child := range process.Children {
 		if childProcess, ok := snapshot.PidProcess[child]; ok {
 			tp.LinkProcess(pid, child)

@@ -2,8 +2,8 @@ package pkg
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
@@ -11,14 +11,7 @@ import (
 	"time"
 
 	"github.com/goccy/go-graphviz"
-	"github.com/goccy/go-graphviz/cgraph"
-	"github.com/sirupsen/logrus"
 )
-
-type Render struct {
-	engine *graphviz.Graphviz
-	graph  *cgraph.Graph
-}
 
 type dotNode struct {
 	ID    string
@@ -48,19 +41,10 @@ func (n dotNode) String() string {
 	return fmt.Sprintf("%s [ label=\"%s\", %s ]", n.ID, n.Label, n.Attrs)
 }
 
-type dotGraphData struct {
-	Title string
-	//Attrs   dotAttrs
-	//Cluster *dotCluster
-	Nodes   []*dotNode
-	Edges   []*dotEdge
-	Options map[string]string
-}
-
 type dotAttrs map[string]string
 
 func (p dotAttrs) List() []string {
-	l := []string{}
+	var l []string
 	for k, v := range p {
 		l = append(l, fmt.Sprintf("%s=%q", k, v))
 	}
@@ -75,14 +59,52 @@ func (p dotAttrs) Lines() string {
 	return fmt.Sprintf("%s;", strings.Join(p.List(), ";\n"))
 }
 
-func NewDotRender() (*Render, error) {
-	g := graphviz.New()
-	graph, _ := g.Graph()
-
-	return &Render{g, graph}, nil
+func makeDotPortLabel(label string, dotPort string) string {
+	return fmt.Sprintf("<p%s> %s", dotPort, label)
 }
 
-func (r *Render) WriteTo(data *dotGraphData, output string) {
+func toDotPort(port uint32) string {
+	// for port == 0, we process it as `no dot node port`
+	if port == 0 {
+		return ""
+	}
+	return ":" + "p" + strconv.Itoa(int(port))
+}
+
+func toDotId(pid int32) string {
+	return "n" + strconv.Itoa(int(pid))
+}
+
+func makeDotLabel(parts map[int]string, items ...string) string {
+	var records = items
+	for id, label := range parts {
+		records = append(records, makeDotPortLabel(label, strconv.Itoa(id)))
+	}
+
+	internal := strings.Join(records, " | ")
+	return fmt.Sprintf("%s", internal)
+}
+
+type dotGraphData struct {
+	Title string
+	//Attrs   dotAttrs
+	//Cluster *dotCluster
+	Nodes   []*dotNode
+	Edges   []*dotEdge
+	Options map[string]string
+}
+
+type DotRender struct {
+	Render
+	engine *graphviz.Graphviz
+}
+
+func NewDotRender() (Render, error) {
+	g := graphviz.New()
+	return &DotRender{engine: g}, nil
+}
+
+func (r *DotRender) writeData(data *dotGraphData, output string) {
 	t := template.New("dot")
 	for _, s := range []string{tmplLegend, tmplCluster, tmplNode, tmplEdge, tmplGraph} {
 		if _, err := t.Parse(s); err != nil {
@@ -111,67 +133,16 @@ func (r *Render) WriteTo(data *dotGraphData, output string) {
 		logrus.Errorln("parse graph error, but try to output the file")
 		return
 	}
+	if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.PNG), output+".png"); err != nil {
+		//fd, _ := os.Open(output)
+		//fd.WriteString(err.Error())
+		logrus.Errorln(err)
+		logrus.Errorln("parse graph error, but try to output the file")
+		return
+	}
 }
 
-func makeDotPortLabel(label string, dotPort string) string {
-	return fmt.Sprintf("<p%s> %s", dotPort, label)
-}
-
-func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error) {
-	graph := r.graph
-	index := map[int32]*cgraph.Node{}
-	for _, node := range topo.PidSet {
-		process := snapshot.PidProcess[node.Pid]
-		name := "n" + strconv.Itoa(int(process.Pid))
-		n, _ := graph.CreateNode(name)
-		index[node.Pid] = n
-	}
-
-	for _, edge := range topo.ConnectionSet {
-		fromNode := index[edge.From]
-		toNode := index[edge.To]
-		if fromNode == nil || toNode == nil {
-			continue
-		}
-		e, err := graph.CreateEdge("", fromNode, toNode)
-		if err != nil {
-			return nil, errors.New("failed")
-		}
-		e.SetColor("red")
-	}
-
-	relatedPidPorts := map[int32][]uint32{}
-	pushPidPort := func(pid int32, port uint32) {
-		ports := relatedPidPorts[pid]
-		relatedPidPorts[pid] = append(ports, port)
-	}
-	for _, e := range topo.PublicConnectionSet {
-		pushPidPort(e.Connection.Pid, e.Connection.Laddr.Port)
-		remotePid := snapshot.PortPid[e.Connection.Raddr.Port]
-		pushPidPort(remotePid, e.Connection.Raddr.Port)
-	}
-	for _, e := range topo.ConnectionSet {
-		pushPidPort(e.Connection.Pid, e.Connection.Laddr.Port)
-		remotePid := snapshot.PortPid[e.Connection.Raddr.Port]
-		pushPidPort(remotePid, e.Connection.Raddr.Port)
-	}
-
-	//// confirm to include all used ports
-	//for _, e := range topo.NetworkEdges {
-	//	data := topo.Snapshot.PidPort[e.From]
-	//	data = append(data, e.Connection.Laddr.Port)
-	//	topo.Snapshot.PidPort[e.From] = data
-	//
-	//	data = topo.Snapshot.PidPort[e.To]
-	//	data = append(data, e.Connection.Raddr.Port)
-	//	topo.Snapshot.PidPort[e.To] = data
-	//}
-	//for _, e := range topo.PublicNetworkEdges {
-	//	data := topo.Snapshot.PidPort[e.From]
-	//	data = append(data, e.Connection.Laddr.Port)
-	//	topo.Snapshot.PidPort[e.From] = data
-	//}
-
+func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 	// create node
 	var nodes []*dotNode
 	for _, n := range topo.PidSet {
@@ -220,20 +191,9 @@ func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error)
 		nodes = append(nodes, node)
 	}
 
-	//var exists = map[string]bool{}
-	//for _, n := range nodes {
-	//	exists[n.ID] = true
-	//}
-
-	// generate edge data at first
+	// generate edge data
 	var edges []*dotEdge
 	for _, e := range topo.PidChildSet {
-		//if ok := exists[toDotId(e.From)]; !ok {
-		//	continue
-		//}
-		//if ok := exists[toDotId(e.To)]; !ok {
-		//	continue
-		//}
 		edge := newDotEdge()
 		edge.From = toDotId(e.From) + toDotPort(0)
 		edge.To = toDotId(e.To) + toDotPort(0)
@@ -242,12 +202,6 @@ func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error)
 		edges = append(edges, edge)
 	}
 	for _, e := range topo.ConnectionSet {
-		//if ok := exists[toDotId(e.From)]; !ok {
-		//	continue
-		//}
-		//if ok := exists[toDotId(e.To)]; !ok {
-		//	continue
-		//}
 		edge := newDotEdge()
 		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = toDotId(e.To) + toDotPort(e.Connection.Raddr.Port)
@@ -255,14 +209,8 @@ func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error)
 		edge.Attrs["color"] = "green"
 		edge.Attrs["dir"] = "both"
 		edges = append(edges, edge)
-
-		//topo.Snapshot.PidPort[e.To] = append(topo.Snapshot.PidPort[e.To], e.Connection.Raddr.Port)
 	}
 	for _, e := range topo.PublicConnectionSet {
-
-		//if ok := exists[toDotId(e.To)]; !ok {
-		//	continue
-		//}
 		ip := e.Connection.Raddr.IP
 		id := "ip" + replaceIPChar(ip)
 		node := &dotNode{
@@ -281,8 +229,6 @@ func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error)
 		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
 		edge.To = id
 		edges = append(edges, edge)
-
-		//topo.Snapshot.PidPort[e.From] = append(topo.Snapshot.PidPort[e.From], e.Connection.Laddr.Port)
 	}
 
 	now := time.Now()
@@ -293,24 +239,11 @@ func (r *Render) ToData(snapshot *Snapshot, topo *PSTopo) (*dotGraphData, error)
 	}, nil
 }
 
-func toDotPort(port uint32) string {
-	// for port == 0, we process it as `no dot node port`
-	if port == 0 {
-		return ""
+func (r *DotRender) Write(topo *PSTopo, output string) error {
+	data, err := r.toData(topo)
+	if err != nil {
+		return err
 	}
-	return ":" + "p" + strconv.Itoa(int(port))
-}
-
-func toDotId(pid int32) string {
-	return "n" + strconv.Itoa(int(pid))
-}
-
-func makeDotLabel(parts map[int]string, items ...string) string {
-	var records []string = items
-	for id, label := range parts {
-		records = append(records, makeDotPortLabel(label, strconv.Itoa(id)))
-	}
-
-	internal := strings.Join(records, " | ")
-	return fmt.Sprintf("%s", internal)
+	r.writeData(data, output)
+	return nil
 }

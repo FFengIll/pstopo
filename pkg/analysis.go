@@ -47,21 +47,17 @@ func AnalyseSnapshot(snapshot *Snapshot, options *Config) *PSTopo {
 		for pid, _ := range pids {
 			topo.AddPid(pid)
 			topo.AddPidNeighbor(pid)
+		}
 
-			// add all ports for the pid
-			var set *PortSet
-			var ok bool
-			set, ok = snapshot.PidListenPort[pid]
-			if ok {
-				for port := range set.Iter() {
-					ports[port] = true
-				}
+		// add all ports for the pid
+		for _, set := range snapshot.PidPort {
+			for port := range set.Iter() {
+				ports[port] = true
 			}
-			set, ok = snapshot.PidPort[pid]
-			if ok {
-				for port := range set.Iter() {
-					ports[port] = true
-				}
+		}
+		for _, set := range snapshot.PidListenPort {
+			for port := range set.Iter() {
+				ports[port] = true
 			}
 		}
 
@@ -79,7 +75,7 @@ func GenerateAll(snapshot *Snapshot, topo *PSTopo) {
 	}
 	for pid, ports := range snapshot.PidPort {
 		for port := range ports.Iter() {
-			conn := snapshot.GetConnections(port)
+			conn := snapshot.GetConnection(port)
 			otherPid := snapshot.PortPid[conn.Raddr.Port]
 			topo.LinkNetwork(pid, otherPid, conn)
 		}
