@@ -2,8 +2,10 @@ package pkg
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	gonet "net"
 	"strconv"
+	"strings"
 
 	"github.com/shirou/gopsutil/v3/net"
 	"gonum.org/v1/gonum/graph"
@@ -45,7 +47,7 @@ func (t *TopoEdge) String() string {
 	return strconv.Itoa(int(t.From)) + "->" + strconv.Itoa(int(t.To))
 }
 
-func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
+func (tp *PSTopo) linkProcess(pid, pid2 int32) {
 	if pid == 0 || pid2 == 0 {
 		return
 	}
@@ -64,7 +66,7 @@ func (tp *PSTopo) LinkProcess(pid, pid2 int32) {
 	}
 }
 
-func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
+func (tp *PSTopo) linkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	if pid == 0 || pid2 == 0 {
 		return
 	}
@@ -82,7 +84,7 @@ func (tp *PSTopo) LinkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
 	}
 }
 
-func (tp *PSTopo) AddProcess(process *Process) {
+func (tp *PSTopo) addProcess(process *Process) {
 	if process.Pid == 0 {
 		return
 	}
@@ -93,14 +95,14 @@ func (tp *PSTopo) AddProcess(process *Process) {
 	tp.PidSet[process.Pid] = process
 }
 
-func (tp *PSTopo) AddPid(pid int32) {
+func (tp *PSTopo) addPid(pid int32) {
 	process, ok := tp.Snapshot.PidProcess[pid]
 	if ok {
-		tp.AddProcess(process)
+		tp.addProcess(process)
 	}
 }
 
-func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
+func (tp *PSTopo) linkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	if pid == 0 {
 		return
 	}
@@ -113,18 +115,18 @@ func (tp *PSTopo) LinkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	}
 }
 
-func (tp *PSTopo) AddPidNeighbor(pid int32) {
+func (tp *PSTopo) addPidNeighbor(pid int32) {
 	snapshot := tp.Snapshot
 	process := snapshot.PidProcess[pid]
 	for _, child := range process.Children {
 		if childProcess, ok := snapshot.PidProcess[child]; ok {
-			tp.LinkProcess(pid, child)
-			tp.AddProcess(childProcess)
+			tp.linkProcess(pid, child)
+			tp.addProcess(childProcess)
 		}
 	}
 	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
-		tp.LinkProcess(process.Parent, pid)
-		tp.AddProcess(parentProcess)
+		tp.linkProcess(process.Parent, pid)
+		tp.addProcess(parentProcess)
 	}
 }
 
@@ -145,14 +147,20 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 		// listen Port
 		listenPort := port
 		listenPid, _ := snapshot.ListenPortPid[listenPort]
+
+		// filter
+		if _, ok := tp.PidSet[listenPid]; !ok {
+			continue
+		}
+
 		connections := snapshot.ListenPortConnections[listenPort]
 		for _, conn := range connections {
 			connPort := conn.Laddr.Port
 			connPid, ok := snapshot.PortPid[connPort]
 			if ok {
-				tp.AddPid(listenPid)
-				tp.AddPid(connPid)
-				tp.LinkNetwork(connPid, listenPid, conn)
+				tp.addPid(listenPid)
+				tp.addPid(connPid)
+				tp.linkNetwork(connPid, listenPid, conn)
 
 				// FIXME: to avoid any potential error, force add the port to pid
 			}
@@ -164,6 +172,11 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 		// establish Port
 		connPid, ok := snapshot.PortPid[localPort]
 		if ok {
+			// filter
+			if _, ok := tp.PidSet[connPid]; !ok {
+				continue
+			}
+
 			conn := snapshot.GetConnection(localPort)
 			if conn.Laddr.Port == localPort { //redundant
 				remoteIP, remotePort := conn.Raddr.IP, conn.Raddr.Port
@@ -171,16 +184,104 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 					// remote is process
 					remotePid, ok := snapshot.PortPid[remotePort]
 					if ok {
-						tp.AddPid(connPid)
-						tp.AddPid(remotePid)
-						tp.LinkNetwork(connPid, remotePid, conn)
+						tp.addPid(connPid)
+						tp.addPid(remotePid)
+						tp.linkNetwork(connPid, remotePid, conn)
 					}
 				} else {
 					// remote is external ip
-					tp.AddPid(conn.Pid)
-					tp.LinkPublicNetwork(connPid, conn)
+					tp.addPid(conn.Pid)
+					tp.linkPublicNetwork(connPid, conn)
 				}
 			}
 		}
 	}
+}
+
+func (tp *PSTopo) Analyse(cfg *Config) *PSTopo {
+	if cfg.All {
+		logrus.Warningf("will generate with all data, it maybe hard")
+		tp.addAll()
+	} else {
+		tp.addMatched(cfg)
+	}
+
+	return tp
+}
+
+func (tp *PSTopo) addAll() {
+	var snapshot = tp.Snapshot
+	for pid, process := range snapshot.PidProcess {
+		tp.addProcess(process)
+		tp.addPidNeighbor(pid)
+	}
+	for pid, ports := range snapshot.PidPort {
+		for port := range ports.Iter() {
+			conn := snapshot.GetConnection(port)
+			otherPid := snapshot.PortPid[conn.Raddr.Port]
+			tp.linkNetwork(pid, otherPid, conn)
+		}
+	}
+}
+
+func (tp *PSTopo) match(cfg *Config) (map[int32]bool, map[uint32]bool) {
+	var snapshot = tp.Snapshot
+
+	pids := map[int32]bool{}
+	ports := map[uint32]bool{}
+	for _, pid := range cfg.Pid {
+		pids[pid] = true
+	}
+
+	// match name
+	for _, name := range cfg.Cmd {
+		for _, p := range snapshot.Processes() {
+			if strings.Contains(p.Cmdline, name) {
+				pids[p.Pid] = true
+				for _, c := range p.Children {
+					pids[c] = true
+				}
+			}
+		}
+	}
+
+	// match port
+	for _, port := range cfg.Port {
+		for listenPort, pid := range snapshot.ListenPortPid {
+			if port == listenPort {
+				pids[pid] = true
+			}
+		}
+		ports[port] = true
+	}
+
+	return pids, ports
+}
+
+func (tp *PSTopo) addMatched(cfg *Config) {
+	var snapshot = tp.Snapshot
+
+	pids, ports := tp.match(cfg)
+
+	// analyse with pids and ports
+	// process Pid
+	for pid, _ := range pids {
+		tp.addPid(pid)
+		tp.addPidNeighbor(pid)
+	}
+
+	// add all ports for the pid
+	for _, set := range snapshot.PidPort {
+		for port := range set.Iter() {
+			ports[port] = true
+		}
+	}
+	for _, set := range snapshot.PidListenPort {
+		for port := range set.Iter() {
+			ports[port] = true
+		}
+	}
+
+	// process Port
+	tp.processPort(ports)
 }

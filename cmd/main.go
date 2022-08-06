@@ -85,7 +85,8 @@ var rootCmd = &cobra.Command{
 			config.Cmd = append(config.Cmd, arg)
 		}
 
-		topo = pkg.AnalyseSnapshot(snapshot, config)
+		topo = pkg.NewTopo(snapshot)
+		topo = topo.Analyse(config)
 		render, _ := pkg.NewDotRender()
 		render.Write(topo, outputName)
 	},

@@ -64,7 +64,8 @@ var reloadCmd = &cobra.Command{
 		}
 
 		var topo *pkg.PSTopo
-		topo = pkg.AnalyseSnapshot(snapshot, config)
+		topo = pkg.NewTopo(snapshot)
+		topo = topo.Analyse(config)
 		render, _ := pkg.NewDotRender()
 		render.Write(topo, outputName)
 		if update {
