@@ -2,12 +2,12 @@ package pkg
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	gonet "net"
 	"strconv"
 	"strings"
 
 	"github.com/shirou/gopsutil/v3/net"
+	"github.com/sirupsen/logrus"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -178,7 +178,7 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 			}
 
 			conn := snapshot.GetConnection(localPort)
-			if conn.Laddr.Port == localPort { //redundant
+			if conn.Laddr.Port == localPort { // redundant
 				remoteIP, remotePort := conn.Raddr.IP, conn.Raddr.Port
 				if isPrivateIP(gonet.ParseIP(remoteIP)) {
 					// remote is process
@@ -272,13 +272,17 @@ func (tp *PSTopo) addMatched(cfg *Config) {
 
 	// add all ports for the pid
 	for _, set := range snapshot.PidPort {
-		for port := range set.Iter() {
-			ports[port] = true
+		if set != nil {
+			for port := range set.Iter() {
+				ports[port] = true
+			}
 		}
 	}
 	for _, set := range snapshot.PidListenPort {
-		for port := range set.Iter() {
-			ports[port] = true
+		if set != nil {
+			for port := range set.Iter() {
+				ports[port] = true
+			}
 		}
 	}
 

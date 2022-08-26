@@ -22,12 +22,20 @@ func NewPortSet() *PortSet {
 
 func (set *PortSet) Iter() <-chan uint32 {
 	ch := make(chan uint32)
-	go func() {
-		for elem := range set.internal.Iter() {
-			ch <- elem.(uint32)
-		}
-		close(ch)
-	}()
+	if set != nil {
+		go func() {
+			if set.internal != nil {
+				for elem := range set.internal.Iter() {
+					ch <- elem.(uint32)
+				}
+			}
+			close(ch)
+		}()
+	} else {
+		go func() {
+			close(ch)
+		}()
+	}
 
 	return ch
 }
