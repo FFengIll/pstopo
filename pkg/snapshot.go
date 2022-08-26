@@ -104,6 +104,7 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 			set, ok := snapshot.PidPort[conn.Pid]
 			if !ok {
 				logrus.WithField("pid", conn.Pid).Warningln("no such pid")
+				continue
 			}
 			set.Add(localPort)
 		}
