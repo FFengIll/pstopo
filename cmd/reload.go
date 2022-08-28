@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -69,7 +70,22 @@ var reloadCmd = &cobra.Command{
 		render, _ := pkg.NewDotRender()
 		render.Write(topo, outputName)
 		if update {
+			//
 			snapshot.DumpFile(snapshotPath)
+
+			// unique
+			cmdSet := mapset.NewSet[string]()
+			for _, c := range config.Cmd {
+				cmdSet.Add(c)
+			}
+			config.Cmd = cmdSet.ToSlice()
+
+			// dump config
+			data, err = json.MarshalIndent(config, "", "  ")
+			if err != nil {
+				return
+			}
+			ioutil.WriteFile(configPath, data, 0660)
 		}
 	},
 }
