@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -11,17 +10,25 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/FFengIll/pstopo/pkg"
 )
 
+var fs afero.Fs
+
 func existFile(path string) bool {
-	file, err := os.Open(path)
-	defer file.Close()
-	if errors.Is(err, os.ErrNotExist) {
+	// exist
+	if ok, _ := afero.Exists(fs, path); !ok {
 		return false
 	}
+
+	// id dir
+	if ok, _ := afero.DirExists(fs, path); ok {
+		return false
+	}
+
 	return true
 }
 
@@ -33,7 +40,7 @@ var rootCmd = &cobra.Command{
 		config := pkg.NewConfig()
 
 		var snapshot *pkg.Snapshot
-		if snapshotPath == "" || !existFile(snapshotPath) {
+		if !existFile(snapshotPath) {
 			logrus.WithField("snapshot", snapshotPath).Infoln("no snapshot existed, take one")
 			// if no given snapshot, then generate a new one
 			snapshot, _ = pkg.TakeSnapshot(connectionKind)
@@ -52,7 +59,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		var topo *pkg.PSTopo
-		if configPath == "" || !existFile(configPath) {
+		if !existFile(configPath) {
 			if len(args) <= 0 {
 				config.All = true
 			} else {
@@ -98,6 +105,8 @@ var outputName = ""
 var connectionKind = ""
 
 func init() {
+	fs = afero.NewOsFs()
+
 	rootCmd.AddCommand(snapshotCmd)
 	rootCmd.AddCommand(reloadCmd)
 
