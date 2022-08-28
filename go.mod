@@ -1,6 +1,6 @@
 module github.com/FFengIll/pstopo
 
-go 1.16
+go 1.18
 
 require (
 	github.com/goccy/go-graphviz v0.0.9
