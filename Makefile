@@ -12,8 +12,7 @@ run:
 	@go run ./
 
 gotool:
-	go fmt ./pkg/*
-	go fmt ./cmd/*
+	go fmt ./...
 
 clean:
 	@if [ -f ${BINARY} ] ; then rm ${BINARY} ; fi
