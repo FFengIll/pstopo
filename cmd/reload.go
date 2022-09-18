@@ -90,9 +90,7 @@ var reloadCmd = &cobra.Command{
 	},
 }
 
-var update = false
-
 func init() {
 	flags := reloadCmd.PersistentFlags()
-	flags.BoolVarP(&update, "update", "u", false, "update related file if possible")
+	flags.BoolVarP(&update, "update", "w", false, "update and rewrite related file if possible")
 }

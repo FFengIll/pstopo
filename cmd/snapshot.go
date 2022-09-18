@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/spf13/cobra"
-
 	"github.com/FFengIll/pstopo/pkg"
+	"github.com/spf13/cobra"
 )
 
 var snapshotCmd = &cobra.Command{
@@ -18,13 +17,11 @@ func executeSnapshot() {
 	if err != nil {
 		panic(err)
 	}
-	snapshot.DumpFile(snapshotFilepath)
+	snapshotPath = fixSnapshotPath(snapshotPath)
+	snapshot.DumpFile(snapshotPath)
 }
-
-var snapshotFilepath = ""
 
 func init() {
 	flags := snapshotCmd.PersistentFlags()
-	flags.StringVarP(&snapshotFilepath, "output", "o", "", "cache snapshot to file")
-	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
+	flags.StringVarP(&snapshotPath, "output", "o", "", "cache snapshot to file")
 }

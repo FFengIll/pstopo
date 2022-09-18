@@ -35,20 +35,25 @@ func existFile(path string) bool {
 var rootCmd = &cobra.Command{
 	Use:  "root",
 	Args: cobra.ArbitraryArgs,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if verbose {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-
 		config := pkg.NewConfig()
+
+		if outputName != "" && snapshotPath == "" {
+			snapshotPath = fixSnapshotPath(outputName)
+			logrus.WithField("snapshot", snapshotPath).Infoln("set default snapshot")
+		}
 
 		var snapshot *pkg.Snapshot
 		if !existFile(snapshotPath) {
 			logrus.WithField("snapshot", snapshotPath).Infoln("no snapshot existed, take one")
 			// if no given snapshot, then generate a new one
 			snapshot, _ = pkg.TakeSnapshot(connectionKind)
-			if outputName != "" {
-				snapshot.DumpFile(outputName + ".snapshot.json")
-			} else {
-				snapshot.DumpFile(snapshotPath)
-			}
+			snapshot.DumpFile(snapshotPath)
 		} else {
 			var json = jsoniter.ConfigCompatibleWithStandardLibrary
 			data, _ := ioutil.ReadFile(snapshotPath)
@@ -99,10 +104,14 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-var snapshotPath = ""
-var configPath = ""
-var outputName = ""
-var connectionKind = ""
+func fixSnapshotPath(name string) string {
+	if !strings.HasSuffix(name, ".snapshot.json") {
+		res := name + ".snapshot.json"
+		return res
+	} else {
+		return name
+	}
+}
 
 func init() {
 	fs = afero.NewOsFs()
@@ -114,7 +123,8 @@ func init() {
 	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
 	flags.StringVarP(&configPath, "config", "c", "", "local topo config file path")
 	flags.StringVarP(&outputName, "output", "o", "output.dot", "output file name")
-	flags.StringVarP(&connectionKind, "connection-kind", "k", "all", "connection kind")
+	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
+	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose with debug info")
 }
 
 func main() {
