@@ -87,8 +87,8 @@ func makeDotLabel(parts map[int]string, items ...string) string {
 
 type dotGraphData struct {
 	Title string
-	//Attrs   dotAttrs
-	//Cluster *dotCluster
+	// Attrs   dotAttrs
+	// Cluster *dotCluster
 	Nodes   []*dotNode
 	Edges   []*dotEdge
 	Options map[string]string
@@ -117,7 +117,7 @@ func (r *DotRender) writeData(data *dotGraphData, output string) {
 		panic(err)
 	}
 
-	fmt.Println(buf.String())
+	logrus.Debugln(buf.String())
 	graph, err := graphviz.ParseBytes(buf.Bytes())
 	if err != nil {
 		panic(err)
@@ -126,16 +126,23 @@ func (r *DotRender) writeData(data *dotGraphData, output string) {
 	if !strings.HasSuffix(output, ".dot") {
 		output = output + ".dot"
 	}
-	if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
-		//fd, _ := os.Open(output)
-		//fd.WriteString(err.Error())
-		logrus.Errorln(err)
-		logrus.Errorln("parse graph error, but try to output the file")
-		return
-	}
+
+	// output dot file
+	fd, _ := os.OpenFile(output, os.O_RDWR|os.O_CREATE, 0660)
+	fd.Write(buf.Bytes())
+	fd.Close()
+
+	// if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
+	// 	//fd, _ := os.Open(output)
+	// 	//fd.WriteString(err.Error())
+	// 	logrus.Errorln(err)
+	// 	logrus.Errorln("parse graph error, but try to output the file")
+	// 	return
+	// }
+
 	if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.PNG), output+".png"); err != nil {
-		//fd, _ := os.Open(output)
-		//fd.WriteString(err.Error())
+		// fd, _ := os.Open(output)
+		// fd.WriteString(err.Error())
 		logrus.Errorln(err)
 		logrus.Errorln("parse graph error, but try to output the file")
 		return
@@ -164,9 +171,9 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 			set, ok := topo.Snapshot.PidPort[n.Pid]
 			if ok {
 				for port := range set.Iter() {
-					//if contains(related, port) {
+					// if contains(related, port) {
 					parts[int(port)] = ":" + strconv.Itoa(int(port))
-					//}
+					// }
 				}
 			}
 		}
@@ -176,9 +183,9 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 			set, ok := topo.Snapshot.PidListenPort[n.Pid]
 			if ok {
 				for port := range set.Iter() {
-					//if contains(related, port) {
+					// if contains(related, port) {
 					parts[int(port)] = "Listen " + ":" + strconv.Itoa(int(port))
-					//}
+					// }
 				}
 			}
 		}
