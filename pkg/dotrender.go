@@ -3,6 +3,7 @@ package pkg
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -128,9 +129,7 @@ func (r *DotRender) writeData(data *dotGraphData, output string) {
 	}
 
 	// output dot file
-	fd, _ := os.OpenFile(output, os.O_RDWR|os.O_CREATE, 0660)
-	fd.Write(buf.Bytes())
-	fd.Close()
+	ioutil.WriteFile(output, buf.Bytes(), 0660)
 
 	// if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
 	// 	//fd, _ := os.Open(output)
