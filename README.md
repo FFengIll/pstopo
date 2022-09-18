@@ -1,20 +1,27 @@
-# pstopo
-Generate topo of process, including process status, port, ~~fd~~ and etc.
+# PSTopo
+Generate topo of process, including process status, port, ~~fd~~, etc.
 
-# workflow
-- take a snapshot of current system info (process, net connection). (using `psutil`)
-- analyse to match target using config (json) and arguments.
-- output the `dot` file, including
+# Workflow
+- take a snapshot (`snapshot.json`) of current system info using `psutil`, including
+  - process
+  - net connection
+- analyse to match target using config (`config.json`) and arguments.
+- output the `dot` file (`output.dot`), including
   - process relationship (pid, cmdline, port)
   - connection info (listen port and host)
   - etc.
 
-# sample
+# Install
+```shell
+go install github.com/FFengIll/pstopo@latest
+```
 
-![](sample/docker.dot.png)
+# Sample
 
-# usage
-## topo
+![](sample/output.dot.png)
+
+# Usage
+## pstopo
 Creating a topo can work with process name, port number or pid number.
 All the matches will be output.
 
@@ -26,18 +33,32 @@ pstopo process_name :port_number pid
 # specific existed snapshot and existed topo (config)
 pstopo -s snapshot.json -t topo.json
 
-# dynamic add config itme
-pstopo -s snapshot.json -t topo.json :8080 zsh
+# dynamic add config items
+pstopo -s snapshot.json -t topo.json -o output_dir/sub_dir :8080 zsh
 ```
 
 ~~Furthermore, if the number is a name, use `-n` or `--name` for it.~~
 
-## snapshot
-`pstopo` can take a snapshot for current system status, 
-then we can get topo from it and never lost original info (or changed while restart and so on). 
+## pstopo reload
+`pstopo reload` to reload exist snapshot and edit output via config in dynamic.
+
+```shell
+# reload
+pstopo reload your_ouput_dir more_option
+
+# with `-w`, pstopo will overwrite config.json
+pstopo reload your_ouput_dir -w more_option
+
+# e.g.
+pstopo reload ./sample -w zsh
+```
+
+## pstopo snapshot
+`pstopo` can take a snapshot for current system status,
+then we can get topo from it and never lost original info (or changed while restart and so on).
 
 ```sh
-pstopo snapshot -o yourname.json
+pstopo snapshot -o your_name.json
 ```
 
 
@@ -51,7 +72,7 @@ Template engine `text/template` is used and work with some inline variable as be
 - pid
 - cmdline
 
-# features
+# Features
 - [x] analyse information of system process and port
 - [x] search and match information
 - [x] build a topo graph of the match
@@ -60,5 +81,5 @@ Template engine `text/template` is used and work with some inline variable as be
 - [x] support template
 - [ ] support customize template (for some info only)
 
-# license
+# License
 [MIT](LICENSE).
