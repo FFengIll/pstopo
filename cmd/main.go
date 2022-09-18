@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -43,9 +43,15 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config := pkg.NewConfig()
 
-		if outputName != "" && snapshotPath == "" {
-			snapshotPath = fixSnapshotPath(outputName)
-			logrus.WithField("snapshot", snapshotPath).Infoln("set default snapshot")
+		err := fs.MkdirAll(outputDir, 0777)
+		if err != nil {
+			panic(err)
+			return
+		}
+
+		if snapshotPath == "" {
+			snapshotPath = path.Join(outputDir, "snapshot.json")
+			logrus.WithField("snapshot", snapshotPath).Infoln("set default snapshot path")
 		}
 
 		var snapshot *pkg.Snapshot
@@ -63,7 +69,11 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		var topo *pkg.PSTopo
+		if configPath == "" {
+			configPath = path.Join(outputDir, "config.json")
+			logrus.WithField("config", configPath).Infoln("set default config path")
+		}
+
 		if !existFile(configPath) {
 			if len(args) <= 0 {
 				config.All = true
@@ -89,18 +99,24 @@ var rootCmd = &cobra.Command{
 				continue
 			}
 
-			ip := net.ParseIP(arg)
-			if ip != nil {
-
-			}
+			// ip := net.ParseIP(arg)
+			// if ip != nil {
+			//
+			// }
 
 			config.Cmd = append(config.Cmd, arg)
 		}
 
+		dumpConfigFile(config, configPath)
+
+		var topo *pkg.PSTopo
 		topo = pkg.NewTopo(snapshot)
 		topo = topo.Analyse(config)
+
+		outputPath := path.Join(outputDir, "output.dot")
+		logrus.WithField("output", outputPath).Infoln("output dot and png")
 		render, _ := pkg.NewDotRender()
-		render.Write(topo, outputName)
+		render.Write(topo, outputPath)
 	},
 }
 
@@ -120,9 +136,9 @@ func init() {
 	rootCmd.AddCommand(reloadCmd)
 
 	flags := rootCmd.PersistentFlags()
-	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path")
-	flags.StringVarP(&configPath, "config", "c", "", "local topo config file path")
-	flags.StringVarP(&outputName, "output", "o", "output.dot", "output file name")
+	flags.StringVarP(&snapshotPath, "snapshot", "s", "", "local cached snapshot file path, default may use `snapshot.json`")
+	flags.StringVarP(&configPath, "config", "c", "", "local config file path, default may use `config.json`")
+	flags.StringVarP(&outputDir, "output", "o", "output", "output dir path")
 	flags.StringVarP(&connectionKind, "kind", "k", "all", "connection kind")
 	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose with debug info")
 }

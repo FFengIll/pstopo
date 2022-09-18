@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net"
+	"path"
 	"strconv"
 	"strings"
 
@@ -19,14 +21,14 @@ var reloadCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
-		reloadName := args[0]
-		if reloadName == "" {
+		outputDir := args[0]
+		if outputDir == "" {
 			panic("no given name")
 		}
 
-		snapshotPath = reloadName + ".snapshot.json"
-		configPath = reloadName + ".topo.json"
-		outputName = reloadName
+		snapshotPath := path.Join(outputDir, "snapshot.json")
+		configPath := path.Join(outputDir, "config.json")
+		outputPath := path.Join(outputDir, "output.dot")
 
 		snapshot := &pkg.Snapshot{}
 		data, _ := ioutil.ReadFile(snapshotPath)
@@ -47,7 +49,8 @@ var reloadCmd = &cobra.Command{
 		}
 
 		// add filter options from cli
-		for _, arg := range args {
+		// except args[0]
+		for _, arg := range args[1:] {
 			// :xx as port
 			// yy as cmdline
 			if strings.HasPrefix(arg, ":") {
@@ -68,26 +71,32 @@ var reloadCmd = &cobra.Command{
 		topo = pkg.NewTopo(snapshot)
 		topo = topo.Analyse(config)
 		render, _ := pkg.NewDotRender()
-		render.Write(topo, outputName)
+		render.Write(topo, outputPath)
 		if update {
-			//
+			logrus.Infoln("overwrite snapshot")
 			snapshot.DumpFile(snapshotPath)
 
-			// unique
-			cmdSet := mapset.NewSet[string]()
-			for _, c := range config.Cmd {
-				cmdSet.Add(c)
-			}
-			config.Cmd = cmdSet.ToSlice()
-
-			// dump config
-			data, err = json.MarshalIndent(config, "", "  ")
-			if err != nil {
-				return
-			}
-			ioutil.WriteFile(configPath, data, 0660)
+			logrus.Infoln("overwrite config")
+			dumpConfigFile(config, configPath)
 		}
 	},
+}
+
+func dumpConfigFile(config *pkg.Config, configPath string) {
+	cmdSet := mapset.NewSet[string]()
+	for _, c := range config.Cmd {
+		cmdSet.Add(c)
+	}
+	config.Cmd = cmdSet.ToSlice()
+
+	// dump config
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return
+	}
+	ioutil.WriteFile(configPath, data, 0660)
+
+	logrus.Infof("config to: %s\n", configPath)
 }
 
 func init() {
