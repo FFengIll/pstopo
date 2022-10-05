@@ -49,6 +49,7 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 	}
 	for _, pid := range pids {
 		p, _ := process.NewProcessWithContext(context.Background(), pid)
+		name, _ := p.Name()
 		exec, _ := p.Exe()
 		cmdline, _ := p.Cmdline()
 		children, _ := p.Children()
@@ -56,6 +57,7 @@ func TakeSnapshot(kind string) (*Snapshot, error) {
 		snapshot.PidPort[pid] = NewPortSet()
 		snapshot.PidProcess[pid] = &Process{
 			Pid:     p.Pid,
+			Name:    name,
 			Exec:    exec,
 			Cmdline: cmdline,
 			Parent: func() int32 {
