@@ -214,7 +214,7 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 		edge.Attrs["color"] = "red"
 		edges = append(edges, edge)
 	}
-	for _, e := range topo.ConnectionSet {
+	for _, e := range topo.PidConnSet {
 		edge := newDotEdge()
 		edge.From = toDotId(e.From) + ItoDotPort(e.Connection.Laddr.Port)
 		edge.To = toDotId(e.To) + ItoDotPort(e.Connection.Raddr.Port)
@@ -223,7 +223,7 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 		edge.Attrs["dir"] = "both"
 		edges = append(edges, edge)
 	}
-	for _, e := range topo.PublicConnectionSet {
+	for _, e := range topo.IPConnSet {
 		ip := e.Connection.Raddr.IP
 		id := "ip" + replaceIPChar(ip)
 		node := &dotNode{

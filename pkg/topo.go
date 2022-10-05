@@ -13,11 +13,11 @@ import (
 
 type PSTopo struct {
 	graph.Graph
-	Snapshot            *Snapshot
-	PidSet              map[int32]*Process
-	ConnectionSet       map[string]*TopoEdge
-	PublicConnectionSet map[string]*TopoEdge
-	PidChildSet         map[string]*TopoEdge
+	Snapshot    *Snapshot
+	PidSet      map[int32]*Process
+	PidConnSet  map[string]*TopoEdge
+	IPConnSet   map[string]*TopoEdge
+	PidChildSet map[string]*TopoEdge
 }
 
 type TopoEdge struct {
@@ -28,11 +28,11 @@ type TopoEdge struct {
 
 func NewTopo(snapshot *Snapshot) *PSTopo {
 	return &PSTopo{
-		Snapshot:            snapshot,
-		PidSet:              map[int32]*Process{},
-		ConnectionSet:       map[string]*TopoEdge{},
-		PublicConnectionSet: map[string]*TopoEdge{},
-		PidChildSet:         map[string]*TopoEdge{},
+		Snapshot:    snapshot,
+		PidSet:      map[int32]*Process{},
+		PidConnSet:  map[string]*TopoEdge{},
+		IPConnSet:   map[string]*TopoEdge{},
+		PidChildSet: map[string]*TopoEdge{},
 	}
 }
 
@@ -48,9 +48,8 @@ func (tp *PSTopo) linkProcess(pid, pid2 int32) {
 		return
 	}
 
-	key := fmt.Sprintf("%d,%d", pid, pid2)
-	_, ok := tp.PidChildSet[key]
-	if ok {
+	key := fmt.Sprintf("%d->%d", pid, pid2)
+	if _, ok := tp.PidChildSet[key]; ok {
 		return
 	}
 	tp.PidChildSet[key] = &TopoEdge{
@@ -59,18 +58,18 @@ func (tp *PSTopo) linkProcess(pid, pid2 int32) {
 	}
 }
 
-func (tp *PSTopo) linkNetwork(pid int32, pid2 int32, conn net.ConnectionStat) {
+func (tp *PSTopo) linkPidPort(pid int32, pid2 int32, conn net.ConnectionStat) {
 	if pid == 0 || pid2 == 0 {
 		return
 	}
 	if pid == pid2 {
 		return
 	}
-	_, ok := tp.ConnectionSet[conn.String()]
+	_, ok := tp.PidConnSet[conn.String()]
 	if ok {
 		return
 	}
-	tp.ConnectionSet[conn.String()] = &TopoEdge{
+	tp.PidConnSet[conn.String()] = &TopoEdge{
 		From:       pid,
 		To:         pid2,
 		Connection: conn,
@@ -95,14 +94,14 @@ func (tp *PSTopo) addPid(pid int32) {
 	}
 }
 
-func (tp *PSTopo) linkPublicNetwork(pid int32, conn net.ConnectionStat) {
+func (tp *PSTopo) linkIPPort(pid int32, conn net.ConnectionStat) {
 	if pid == 0 {
 		return
 	}
-	if _, ok := tp.PublicConnectionSet[conn.String()]; ok {
+	if _, ok := tp.IPConnSet[conn.String()]; ok {
 		return
 	}
-	tp.PublicConnectionSet[conn.String()] = &TopoEdge{
+	tp.IPConnSet[conn.String()] = &TopoEdge{
 		From:       pid,
 		Connection: conn,
 	}
@@ -174,7 +173,7 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 			if ok {
 				tp.addPid(listenPid)
 				tp.addPid(connPid)
-				tp.linkNetwork(connPid, listenPid, conn)
+				tp.linkPidPort(connPid, listenPid, conn)
 
 				// FIXME: to avoid any potential error, force add the port to pid
 			}
@@ -200,12 +199,12 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 					if ok {
 						tp.addPid(connPid)
 						tp.addPid(remotePid)
-						tp.linkNetwork(connPid, remotePid, conn)
+						tp.linkPidPort(connPid, remotePid, conn)
 					}
 				} else {
 					// remote is external ip
 					tp.addPid(conn.Pid)
-					tp.linkPublicNetwork(connPid, conn)
+					tp.linkIPPort(connPid, conn)
 				}
 			}
 		}
@@ -224,7 +223,7 @@ func (tp *PSTopo) Analyse(cfg *Config) *PSTopo {
 			for port := range ports.Iter() {
 				conn := snapshot.GetConnection(port)
 				otherPid := snapshot.PortPid[conn.Raddr.Port]
-				tp.linkNetwork(pid, otherPid, conn)
+				tp.linkPidPort(pid, otherPid, conn)
 			}
 		}
 	} else {
