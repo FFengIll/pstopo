@@ -134,12 +134,13 @@ func (tp *PSTopo) addPidNeighbor(pid int32) {
 	tp.addPidChildren(pid)
 
 	// FIXME: recursively add process parent
+	next := pid
 	for {
-		next := tp.addPidParent(pid)
-		if next == 0 || next == pid {
+		tmp := tp.addPidParent(next)
+		if next == 0 || next == 1 || tmp == next {
 			break
 		}
-		tp.addPidParent(next)
+		next = tmp
 	}
 }
 
