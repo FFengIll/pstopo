@@ -64,12 +64,16 @@ func makeDotPortLabel(label string, dotPort string) string {
 	return fmt.Sprintf("<p%s> %s", dotPort, label)
 }
 
-func toDotPort(port uint32) string {
-	// for port == 0, we process it as `no dot node port`
+func ItoDotPort(port uint32) string {
+	// FIXME: for port == 0, we process it as `no dot node port`
 	if port == 0 {
 		return ""
 	}
-	return ":" + "p" + strconv.Itoa(int(port))
+	return StoDotPort(strconv.Itoa(int(port)))
+}
+
+func StoDotPort(port string) string {
+	return ":" + "p" + port
 }
 
 func toDotId(pid int32) string {
@@ -83,7 +87,7 @@ func makeDotLabel(parts map[int]string, items ...string) string {
 	}
 
 	internal := strings.Join(records, " | ")
-	return fmt.Sprintf("%s", internal)
+	return internal
 }
 
 type dotGraphData struct {
@@ -167,6 +171,9 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 
 		// TODO: may only include related port (but it may not good)
 		{
+			// FIXME: add default port for 0
+			// parts[int(0)] = ":" + strconv.Itoa(int(0))
+
 			set, ok := topo.Snapshot.PidPort[n.Pid]
 			if ok {
 				for port := range set.Iter() {
@@ -190,7 +197,7 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 		}
 
 		paths := strings.Split(n.Exec, string(os.PathSeparator))
-		pidLabel := makeDotPortLabel(strconv.Itoa(int(n.Pid)), "0")
+		pidLabel := makeDotPortLabel(strconv.Itoa(int(n.Pid)), "p")
 		label := makeDotLabel(parts, paths[len(paths)-1], pidLabel)
 		node.Label = label
 
@@ -201,16 +208,16 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 	var edges []*dotEdge
 	for _, e := range topo.PidChildSet {
 		edge := newDotEdge()
-		edge.From = toDotId(e.From) + toDotPort(0)
-		edge.To = toDotId(e.To) + toDotPort(0)
+		edge.From = toDotId(e.From) + StoDotPort("p")
+		edge.To = toDotId(e.To) + StoDotPort("p")
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "red"
 		edges = append(edges, edge)
 	}
 	for _, e := range topo.ConnectionSet {
 		edge := newDotEdge()
-		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
-		edge.To = toDotId(e.To) + toDotPort(e.Connection.Raddr.Port)
+		edge.From = toDotId(e.From) + ItoDotPort(e.Connection.Laddr.Port)
+		edge.To = toDotId(e.To) + ItoDotPort(e.Connection.Raddr.Port)
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "darkgreen"
 		edge.Attrs["dir"] = "both"
@@ -232,7 +239,7 @@ func (r *DotRender) toData(topo *PSTopo) (*dotGraphData, error) {
 		edge.Attrs["label"] = ""
 		edge.Attrs["color"] = "blue"
 		edge.Attrs["dir"] = "both"
-		edge.From = toDotId(e.From) + toDotPort(e.Connection.Laddr.Port)
+		edge.From = toDotId(e.From) + ItoDotPort(e.Connection.Laddr.Port)
 		edge.To = id
 		edges = append(edges, edge)
 	}
