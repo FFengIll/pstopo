@@ -215,39 +215,36 @@ func (tp *PSTopo) processPort(ports map[uint32]bool) {
 func (tp *PSTopo) Analyse(cfg *Config) *PSTopo {
 	if cfg.All {
 		logrus.Warningf("will generate with all data, it maybe hard")
-		tp.addAll()
+		var snapshot = tp.Snapshot
+		for pid, process := range snapshot.PidProcess {
+			tp.addProcess(process)
+			tp.addPidNeighbor(pid)
+		}
+		for pid, ports := range snapshot.PidPort {
+			for port := range ports.Iter() {
+				conn := snapshot.GetConnection(port)
+				otherPid := snapshot.PortPid[conn.Raddr.Port]
+				tp.linkNetwork(pid, otherPid, conn)
+			}
+		}
 	} else {
-		tp.addMatched(cfg)
+		tp.filter(cfg)
 	}
 
 	return tp
 }
 
-func (tp *PSTopo) addAll() {
-	var snapshot = tp.Snapshot
-	for pid, process := range snapshot.PidProcess {
-		tp.addProcess(process)
-		tp.addPidNeighbor(pid)
-	}
-	for pid, ports := range snapshot.PidPort {
-		for port := range ports.Iter() {
-			conn := snapshot.GetConnection(port)
-			otherPid := snapshot.PortPid[conn.Raddr.Port]
-			tp.linkNetwork(pid, otherPid, conn)
-		}
-	}
-}
-
-func (tp *PSTopo) match(cfg *Config) (map[int32]bool, map[uint32]bool) {
+func (tp *PSTopo) filterPid(cfg *Config) map[int32]bool {
 	var snapshot = tp.Snapshot
 
 	pids := map[int32]bool{}
-	ports := map[uint32]bool{}
+
+	// filter by pid
 	for _, pid := range cfg.Pid {
 		pids[pid] = true
 	}
 
-	// match name
+	// filter by name
 	for _, name := range cfg.Cmd {
 		for _, p := range snapshot.Processes() {
 			if strings.Contains(p.Cmdline, name) {
@@ -259,29 +256,25 @@ func (tp *PSTopo) match(cfg *Config) (map[int32]bool, map[uint32]bool) {
 		}
 	}
 
-	// match port
+	// filter by (listen) port
 	for _, port := range cfg.Port {
 		for listenPort, pid := range snapshot.ListenPortPid {
 			if port == listenPort {
 				pids[pid] = true
 			}
 		}
-		ports[port] = true
 	}
 
-	return pids, ports
+	return pids
 }
 
-func (tp *PSTopo) addMatched(cfg *Config) {
-	var snapshot = tp.Snapshot
+func (tp *PSTopo) filterPort(cfg *Config) map[uint32]bool {
+	snapshot := tp.Snapshot
+	ports := map[uint32]bool{}
 
-	pids, ports := tp.match(cfg)
-
-	// analyse with pids and ports
-	// process Pid
-	for pid, _ := range pids {
-		tp.addPid(pid)
-		tp.addPidNeighbor(pid)
+	// filter by (listen) port
+	for _, port := range cfg.Port {
+		ports[port] = true
 	}
 
 	// add all ports for the pid
@@ -300,6 +293,21 @@ func (tp *PSTopo) addMatched(cfg *Config) {
 		}
 	}
 
-	// process Port
+	return ports
+
+}
+
+func (tp *PSTopo) filter(cfg *Config) {
+	// process Pid at first and then the port
+
+	// process Pid
+	pids := tp.filterPid(cfg)
+	for pid, _ := range pids {
+		tp.addPid(pid)
+		tp.addPidNeighbor(pid)
+	}
+
+	// process port
+	ports := tp.filterPort(cfg)
 	tp.processPort(ports)
 }
