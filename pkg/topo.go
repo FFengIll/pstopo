@@ -11,11 +11,6 @@ import (
 	"gonum.org/v1/gonum/graph"
 )
 
-type PairID struct {
-	Pid  int32
-	Port uint32
-}
-
 type PSTopo struct {
 	graph.Graph
 	Snapshot            *Snapshot
@@ -24,8 +19,6 @@ type PSTopo struct {
 	PublicConnectionSet map[string]*TopoEdge
 	PidChildSet         map[string]*TopoEdge
 }
-
-type TopoNode Process
 
 type TopoEdge struct {
 	From       int32
@@ -115,7 +108,18 @@ func (tp *PSTopo) linkPublicNetwork(pid int32, conn net.ConnectionStat) {
 	}
 }
 
-func (tp *PSTopo) addPidNeighbor(pid int32) {
+func (tp *PSTopo) addPidParent(pid int32) int32 {
+	snapshot := tp.Snapshot
+	process := snapshot.PidProcess[pid]
+	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
+		tp.linkProcess(process.Parent, pid)
+		tp.addProcess(parentProcess)
+		return process.Parent
+	}
+	return 0
+}
+
+func (tp *PSTopo) addPidChildren(pid int32) {
 	snapshot := tp.Snapshot
 	process := snapshot.PidProcess[pid]
 	for _, child := range process.Children {
@@ -124,9 +128,18 @@ func (tp *PSTopo) addPidNeighbor(pid int32) {
 			tp.addProcess(childProcess)
 		}
 	}
-	if parentProcess, ok := snapshot.PidProcess[process.Parent]; ok {
-		tp.linkProcess(process.Parent, pid)
-		tp.addProcess(parentProcess)
+}
+
+func (tp *PSTopo) addPidNeighbor(pid int32) {
+	tp.addPidChildren(pid)
+
+	// FIXME: recursively add process parent
+	for {
+		next := tp.addPidParent(pid)
+		if next == 0 || next == pid {
+			break
+		}
+		tp.addPidParent(next)
 	}
 }
 

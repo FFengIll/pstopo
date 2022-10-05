@@ -46,7 +46,6 @@ var rootCmd = &cobra.Command{
 		err := fs.MkdirAll(outputDir, 0777)
 		if err != nil {
 			panic(err)
-			return
 		}
 
 		if snapshotPath == "" {
