@@ -5,10 +5,10 @@ const tmplLegend = `{{define "legend" -}}
     label = "Legend";
 	graph [shape=box, fontsize=25]
 	node [shape="box"]
-    process->socket [color=darkgreen, label="socket connection", dir="both"]
-    process->ip_port [color=blue, label="connection to ip", dir="both"]
-    process->child_pid [color=red, label="process hierarchy"]
-    process [label="executable | pid, e.g. 23333 | colon port, e.g. :8080", shape=record]
+    process:8080->socket [color=darkgreen, label="socket connection", dir="both"]
+    process:8080->ip_port [color=blue, label="connection to ip", dir="both"]
+    process:p ->child_pid [color=red, label="process hierarchy"]
+    process [label="executable | <p> pid, e.g. 23333 |  <8080> colon port, e.g. :8080", shape=record]
   }
 {{- end}}`
 
