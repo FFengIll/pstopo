@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	All  bool     `json:"all"`
+	All  bool     `json:"all" default:"false"`
 	Cmd  []string `json:"cmd"`
 	Port []uint32 `json:"port"`
 	Pid  []int32  `json:"pid"`

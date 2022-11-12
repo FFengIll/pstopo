@@ -50,21 +50,31 @@ var reloadCmd = &cobra.Command{
 
 		// add filter options from cli
 		// except args[0]
-		for _, arg := range args[1:] {
+		for _, arg := range args {
 			// :xx as port
 			// yy as cmdline
 			if strings.HasPrefix(arg, ":") {
-				port, _ := strconv.Atoi(arg[1:])
-				config.Port = append(config.Port, uint32(port))
-				continue
+				port, err := strconv.Atoi(arg[1:])
+				if err == nil {
+					config.Port = append(config.Port, uint32(port))
+					logrus.Warningf("add port: %s", arg)
+					continue
+				}
 			}
 
 			ip := net.ParseIP(arg)
 			if ip != nil {
-
+				logrus.Warningf("(NOT IMPLEMENTED) add ip: %s", ip)
 			}
 
+			logrus.Infof("add cmd: %s", arg)
 			config.Cmd = append(config.Cmd, arg)
+		}
+
+		if len(config.Cmd) <= 0 {
+			config.All = true
+		} else {
+			config.All = false
 		}
 
 		var topo *pkg.PSTopo
