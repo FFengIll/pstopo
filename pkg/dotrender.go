@@ -2,8 +2,8 @@ package pkg
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -105,7 +105,10 @@ type DotRender struct {
 }
 
 func NewDotRender() (Render, error) {
-	g := graphviz.New()
+	g, err := graphviz.New(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	return &DotRender{engine: g}, nil
 }
 
@@ -133,7 +136,7 @@ func (r *DotRender) writeData(data *dotGraphData, output string) {
 	}
 
 	// output dot file
-	ioutil.WriteFile(output, buf.Bytes(), 0660)
+	os.WriteFile(output, buf.Bytes(), os.ModePerm)
 
 	// if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.DOT), output); err != nil {
 	// 	//fd, _ := os.Open(output)
@@ -143,7 +146,7 @@ func (r *DotRender) writeData(data *dotGraphData, output string) {
 	// 	return
 	// }
 
-	if err := r.engine.RenderFilename(graph, graphviz.Format(graphviz.PNG), output+".png"); err != nil {
+	if err := r.engine.RenderFilename(context.Background(), graph, graphviz.PNG, output+".png"); err != nil {
 		// fd, _ := os.Open(output)
 		// fd.WriteString(err.Error())
 		logrus.Errorln(err)

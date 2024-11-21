@@ -3,7 +3,7 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -133,7 +133,7 @@ func (s *Snapshot) DumpFile(filepath string) {
 	}
 	log.Infof("snapshot to: %s", filepath)
 	bytes := s.Dump()
-	err := ioutil.WriteFile(filepath, bytes, 0644)
+	err := os.WriteFile(filepath, bytes, 0644)
 	if err != nil {
 		return
 	}

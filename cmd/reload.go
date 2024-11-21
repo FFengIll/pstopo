@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -31,7 +31,7 @@ var reloadCmd = &cobra.Command{
 		outputPath := path.Join(outputDir, "output.dot")
 
 		snapshot := &pkg.Snapshot{}
-		data, _ := ioutil.ReadFile(snapshotPath)
+		data, _ := os.ReadFile(snapshotPath)
 		err := json.Unmarshal(data, snapshot)
 		if err != nil {
 			panic(err)
@@ -39,7 +39,7 @@ var reloadCmd = &cobra.Command{
 
 		config := pkg.NewConfig()
 		if existFile(configPath) {
-			data, _ = ioutil.ReadFile(configPath)
+			data, _ = os.ReadFile(configPath)
 			err = json.Unmarshal(data, &config)
 			if err != nil {
 				panic(err)
@@ -104,7 +104,7 @@ func dumpConfigFile(config *pkg.Config, configPath string) {
 	if err != nil {
 		return
 	}
-	ioutil.WriteFile(configPath, data, 0660)
+	os.WriteFile(configPath, data, os.ModePerm)
 
 	logrus.Infof("config to: %s\n", configPath)
 }

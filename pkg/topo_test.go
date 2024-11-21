@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
@@ -11,7 +11,7 @@ func generateSnapshot() *Snapshot {
 	cachedSnapshot := "./latest.json"
 	snapshot := NewSnapshot()
 	var json = jsoniter.ConfigCompatibleWithStandardLibrary
-	data, _ := ioutil.ReadFile(cachedSnapshot)
+	data, _ := os.ReadFile(cachedSnapshot)
 	err := json.Unmarshal(data, snapshot)
 	if err != nil {
 		panic(err)

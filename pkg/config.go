@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"io/ioutil"
+	"os"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -30,7 +30,7 @@ func (c *Config) WriteTo(path string) {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(path, data, 0555)
+	err = os.WriteFile(path, data, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}

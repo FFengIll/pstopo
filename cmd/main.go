@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -61,7 +60,7 @@ var rootCmd = &cobra.Command{
 			snapshot.DumpFile(snapshotPath)
 		} else {
 			var json = jsoniter.ConfigCompatibleWithStandardLibrary
-			data, _ := ioutil.ReadFile(snapshotPath)
+			data, _ := os.ReadFile(snapshotPath)
 			err := json.Unmarshal(data, &snapshot)
 			if err != nil {
 				panic(err)
@@ -81,7 +80,7 @@ var rootCmd = &cobra.Command{
 			}
 		} else {
 			var json = jsoniter.ConfigCompatibleWithStandardLibrary
-			data, _ := ioutil.ReadFile(configPath)
+			data, _ := os.ReadFile(configPath)
 			err := json.Unmarshal(data, &config)
 			if err != nil {
 				panic(err)

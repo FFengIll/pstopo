@@ -3,20 +3,20 @@ package pkg
 import (
 	"sync"
 
-	sets "github.com/deckarep/golang-set"
+	sets "github.com/deckarep/golang-set/v2"
 	jsoniter "github.com/json-iterator/go"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type PortSet struct {
-	internal sets.Set
+	internal sets.Set[uint32]
 	sync.Once
 }
 
 func NewPortSet() *PortSet {
 	return &PortSet{
-		internal: sets.NewSet(),
+		internal: sets.NewSet[uint32](),
 	}
 }
 
@@ -26,7 +26,7 @@ func (set *PortSet) Iter() <-chan uint32 {
 		go func() {
 			if set.internal != nil {
 				for elem := range set.internal.Iter() {
-					ch <- elem.(uint32)
+					ch <- elem
 				}
 			}
 			close(ch)
@@ -59,7 +59,7 @@ func (set *PortSet) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if set.internal == nil {
-		set.internal = sets.NewSet()
+		set.internal = sets.NewSet[uint32]()
 	}
 	for _, item := range array {
 		set.internal.Add(item)
