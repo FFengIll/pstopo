@@ -243,10 +243,19 @@ func (tp *PSTopo) filterPid(cfg *Config) map[int32]bool {
 		pids[pid] = true
 	}
 
+	// check all
+	useAll := false
+	for _, name := range cfg.Cmd {
+		if name == "*" {
+			useAll = true
+			break
+		}
+	}
+
 	// filter by name
 	for _, name := range cfg.Cmd {
 		for _, p := range snapshot.Processes() {
-			if strings.Contains(p.Cmdline, name) {
+			if useAll || strings.Contains(p.Cmdline, name) {
 				pids[p.Pid] = true
 				for _, c := range p.Children {
 					pids[c] = true
@@ -301,7 +310,7 @@ func (tp *PSTopo) filter(cfg *Config) {
 
 	// process Pid
 	pids := tp.filterPid(cfg)
-	for pid, _ := range pids {
+	for pid := range pids {
 		tp.addPid(pid)
 		tp.addPidNeighbor(pid)
 	}
